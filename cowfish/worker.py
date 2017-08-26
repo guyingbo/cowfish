@@ -8,7 +8,7 @@ class BatchWorker:
     def __init__(self, handler, maxsize=0, aggr_num=10, timeout=5):
         self.queue = asyncio.Queue(maxsize)
         self.handler = handler
-        self.max_num = max_num
+        self.aggr_num = aggr_num
         self.timeout = timeout
         self.quit = object()
         self.shutdown = False
@@ -35,7 +35,7 @@ class BatchWorker:
     async def _get_obj_list(self):
         obj_list = []
         timeout = self.timeout
-        while timeout > 0 and len(obj_list) < self.max_num:
+        while timeout > 0 and len(obj_list) < self.aggr_num:
             timestamp = time.time()
             try:
                 obj = await asyncio.wait_for(self.queue.get(), timeout)
