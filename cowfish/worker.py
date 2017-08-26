@@ -5,8 +5,8 @@ logger = logging.getLogger(__name__)
 
 
 class BatchWorker:
-    def __init__(self, handler, max_num=10, timeout=5):
-        self.queue = asyncio.Queue()
+    def __init__(self, handler, maxsize=0, aggr_num=10, timeout=5):
+        self.queue = asyncio.Queue(maxsize)
         self.handler = handler
         self.max_num = max_num
         self.timeout = timeout

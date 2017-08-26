@@ -8,6 +8,7 @@ import argparse
 import importlib
 import aiobotocore
 from functools import partial
+from .worker import BatchWorker
 logger = logging.getLogger(__name__)
 __description__ = 'An AWS SQS processer using asyncio/aiobotocore'
 
@@ -35,60 +36,6 @@ class Message(dict):
         return self.get('Attributes', {})
 
 
-class BatchWorker:
-    def __init__(self, handler, qsize=30, max_num=10, timeout=5):
-        self.queue = asyncio.Queue(qsize)
-        self.handler = handler
-        self.max_num = max_num
-        self.timeout = timeout
-        self.quit = object()
-        self.shutdown = False
-        self.fut = None
-        self.start()
-
-    async def put(self, obj):
-        await self.queue.put(obj)
-
-    def start(self):
-        self.fut = asyncio.ensure_future(self.run())
-
-    async def stop(self):
-        await self.queue.put(self.quit)
-        if self.fut:
-            await asyncio.wait_for(self.fut, None)
-
-    async def _get_obj_list(self):
-        obj_list = []
-        timeout = self.timeout
-        while timeout > 0 and len(obj_list) < self.max_num:
-            timestamp = time.time()
-            try:
-                obj = await asyncio.wait_for(self.queue.get(), timeout)
-            except asyncio.TimeoutError:
-                break
-            if obj is self.quit:
-                self.shutdown = True
-                break
-            obj_list.append(obj)
-            timeout -= time.time() - timestamp
-        return obj_list
-
-    async def run(self):
-        while not self.shutdown:
-            obj_list = await self._get_obj_list()
-            if not obj_list:
-                continue
-            try:
-                result = self.handler(obj_list)
-                if asyncio.iscoroutine(result):
-                    result = await result
-                if result:
-                    for obj in result:
-                        await self.queue.put(obj)
-            except Exception as e:
-                logger.exception(e)
-
-
 class SQSProcesser:
     MAX_RETRY = 10
 
@@ -114,10 +61,12 @@ class SQSProcesser:
         self.change_client = self.create_client()
         if batch_ops:
             self.delete_worker = BatchWorker(
-                partial(self.delete_batch, self.delete_client)
+                partial(self.delete_batch, self.delete_client),
+                maxsize=30,
             )
             self.change_worker = BatchWorker(
-                partial(self.change_batch, self.change_client)
+                partial(self.change_batch, self.change_client),
+                maxsize=30,
             )
         else:
             self.delete_worker = None

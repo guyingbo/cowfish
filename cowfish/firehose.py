@@ -13,7 +13,7 @@ class Firehose:
 
     def __init__(self, stream_name, region_name,
                  encode_func=None, delimiter=b'\n',
-                 record_aggr_number=100, flush_interval=60,
+                 aggr_num=100, flush_interval=60,
                  **pool_kwargs):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
@@ -23,7 +23,7 @@ class Firehose:
         self.jobs = set()
         self.pool = Pool(self.create_client, **pool_kwargs)
         self.worker = BatchWorker(
-            self.handle, record_aggr_number, flush_interval
+            self.handle, aggr_num=aggr_num, timeout=flush_interval
         )
 
     def __repr__(self):
