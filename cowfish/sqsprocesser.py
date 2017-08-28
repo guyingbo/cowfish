@@ -1,4 +1,3 @@
-import time
 import base64
 import pickle
 import signal
@@ -49,12 +48,12 @@ class SQSProcesser:
         self.visibility_timeout = visibility_timeout
         self.idle_sleep = idle_sleep
         self.QueueUrl = None
+        self.lock = asyncio.Lock()
         self.session = aiobotocore.get_session()
         self.loop = asyncio.get_event_loop()
         self.quit_event = asyncio.Event()
         self.loop.add_signal_handler(signal.SIGINT, self.quit_event.set)
         self.loop.add_signal_handler(signal.SIGTERM, self.quit_event.set)
-        self.loop.run_until_complete(self._get_queue_url())
         self.semaphore = asyncio.Semaphore(concurrency)
         self.futures = set()
         self.delete_client = self.create_client()
@@ -79,9 +78,12 @@ class SQSProcesser:
 
     async def _get_queue_url(self):
         if self.QueueUrl is None:
-            async with self.create_client() as client:
-                resp = await client.get_queue_url(QueueName=self.queue_name)
-                self.QueueUrl = resp['QueueUrl']
+            async with self.lock:
+                async with self.create_client() as client:
+                    resp = await client.get_queue_url(
+                            QueueName=self.queue_name
+                        )
+                    self.QueueUrl = resp['QueueUrl']
         return self.QueueUrl
 
     def create_client(self):
@@ -106,7 +108,7 @@ class SQSProcesser:
 
     async def _fetch_messages(self, client):
         response = await client.receive_message(
-            QueueUrl=self.QueueUrl,
+            QueueUrl=(await self._get_queue_url()),
             AttributeNames=['ApproximateReceiveCount'],
             MessageAttributeNames=['All'],
             MaxNumberOfMessages=10,
@@ -150,7 +152,7 @@ class SQSProcesser:
             raise Exception('change_message_visibility_batch failed', messages)
         try:
             resp = await client.change_message_visibility_batch(
-                QueueUrl=self.QueueUrl,
+                QueueUrl=(await self._get_queue_url()),
                 Entries=[
                     {
                         'Id': str(index),
@@ -179,7 +181,7 @@ class SQSProcesser:
             return
         async with self.create_client() as client:
             return await client.change_message_visibility(
-                QueueUrl=self.QueueUrl,
+                QueueUrl=(await self._get_queue_url()),
                 ReceiptHandle=message['ReceiptHandle'],
                 VisibilityTimeout=visibility_timeout
             )
@@ -191,7 +193,7 @@ class SQSProcesser:
             raise Exception('delete_message_batch failed', messages)
         try:
             resp = await client.delete_message_batch(
-                QueueUrl=self.QueueUrl,
+                QueueUrl=(await self._get_queue_url()),
                 Entries=[
                     {
                         'Id': str(index),
@@ -219,7 +221,7 @@ class SQSProcesser:
             return
         async with self.create_client() as client:
             return await client.delete_message(
-                QueueUrl=self.QueueUrl,
+                QueueUrl=(await self._get_queue_url()),
                 ReceiptHandle=message['ReceiptHandle']
             )
 

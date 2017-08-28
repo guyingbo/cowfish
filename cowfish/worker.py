@@ -20,6 +20,10 @@ class BatchWorker:
             self.__class__.__name__, self.queue.qsize()
         )
 
+    @property
+    def qsize(self):
+        return self.queue.qsize()
+
     async def put(self, obj):
         await self.queue.put(obj)
 

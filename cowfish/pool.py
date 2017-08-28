@@ -39,6 +39,7 @@ class Pool:
                 client.close()
             for client in self._using:
                 client.close()
+            self._using.clear()
 
     async def close(self):
         if not self._close_state.is_set():
@@ -85,7 +86,7 @@ class Pool:
             while not self._pool and self.size < self.maxsize:
                 self._acquiring += 1
                 try:
-                    client = self.client_manager.create_client()
+                    client = self.factory()
                     self._pool.append(client)
                 finally:
                     self._acquiring -= 1

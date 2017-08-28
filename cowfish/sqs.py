@@ -90,7 +90,7 @@ class SQSWriter:
             await self.worker.put(message)
             return
         try:
-            async with self.create_client() as client:
+            async with self.pool.get() as client:
                 return await client.send_message(
                     QueueUrl=(await self._get_queue_url()),
                     MessageBody=self._encode(record),
