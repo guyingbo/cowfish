@@ -26,7 +26,7 @@ setup(
     maintainer_email='tensiongyb@gmail.com',
     url='https://github.com/guyingbo/cowfish',
     packages=['cowfish'],
-    python_requires='>=3.6',
+    python_requires='>=3.5',
     install_requires=[
         'aiobotocore',
     ],
@@ -36,6 +36,7 @@ setup(
         ],
     },
     classifiers=[
+        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
     setup_requires=['pytest-runner'],
