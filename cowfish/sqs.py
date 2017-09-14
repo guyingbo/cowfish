@@ -19,6 +19,7 @@ class SQSWriter:
                  encode_func=None, **pool_kwargs):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
+        self.is_fifo = queue_name.endswith('.fifo')
         self.region_name = region_name
         self.encode_func = encode_func or (
             lambda o: base64.b64encode(pickle.dumps(o, 2)).decode('ascii')
@@ -34,9 +35,6 @@ class SQSWriter:
         return '<{}: queue={}, region={}, worker={!r}, pool={!r}>'.format(
                 self.__class__.__name__, self.queue_name, self.region_name,
                 self.worker, self.pool)
-
-    async def put(self, obj):
-        return await self.worker.put(obj)
 
     async def _get_queue_url(self):
         if self.QueueUrl is None:
@@ -75,8 +73,9 @@ class SQSWriter:
         self.jobs.add(fut)
         fut.add_done_callback(self.jobs.remove)
 
-    async def write_one(self, record, delay_seconds=0, queued=False, _seq=0,
-                        **attributes):
+    async def write_one(self, record, delay_seconds=0,
+                        deduplication_id=None, group_id=None,
+                        queued=False, _seq=0, **attributes):
         if _seq > 0:
             await asyncio.sleep(0.1 * (2 ** _seq))
         if _seq > self.MAX_RETRY - 1:
@@ -85,7 +84,13 @@ class SQSWriter:
             'record': record,
             'delay_seconds': delay_seconds,
             'attributes': attributes,
+            'params': {},
         }
+        if self.is_fifo:
+            if deduplication_id:
+                message['params']['MessageDeduplicationId'] = deduplication_id
+            if group_id:
+                message['params']['MessageGroupId'] = group_id
         if queued:
             await self.worker.put(message)
             return
@@ -96,11 +101,13 @@ class SQSWriter:
                     MessageBody=self._encode(record),
                     DelaySeconds=delay_seconds,
                     MessageAttributes=attributes,
+                    **message['params'],
                 )
         except Exception as e:
             logger.exception(e)
             return await self.write_one(
                     record, delay_seconds=delay_seconds,
+                    deduplication_id=deduplication_id, group_id=group_id,
                     queued=False, _seq=_seq+1, **attributes)
 
     async def write_batch(self, client, obj_list, _seq=0):
@@ -115,6 +122,7 @@ class SQSWriter:
                 'MessageBody': self._encode(message['record']),
                 'DelaySeconds': message['delay_seconds'],
                 'MessageAttributes': message['attributes'],
+                **message['params'],
             } for i, message in enumerate(obj_list)
         ]
         try:
@@ -136,11 +144,14 @@ class SQSWriter:
                 client, failed_obj_list, _seq=_seq + 1
             )
 
-    def async_rpc(self, func=None, *, delay_seconds=0, queued=True,
-                  **attributes):
+    def async_rpc(self, func=None, *, delay_seconds=0,
+                  deduplication_id=None, group_id=None,
+                  queued=True, **attributes):
         if func is None:
             return functools.partial(self.async_rpc,
                                      delay_seconds=delay_seconds,
+                                     deduplication_id=deduplication_id,
+                                     group_id=group_id,
                                      queued=queued, **attributes)
         if type(func) == str:
             async def async_func(*args, **kw):
@@ -150,6 +161,8 @@ class SQSWriter:
                     'kw': kw,
                 }
                 await self.write_one(record, delay_seconds=delay_seconds,
+                                     deduplication_id=deduplication_id,
+                                     group_id=group_id,
                                      queued=queued, **attributes)
         else:
             @functools.wraps(func)
@@ -161,34 +174,9 @@ class SQSWriter:
                     'kw': kw,
                 }
                 await self.write_one(record, delay_seconds=delay_seconds,
+                                     deduplication_id=deduplication_id,
+                                     group_id=group_id,
                                      queued=queued, **attributes)
-        return async_func
-
-    # compatible with old async wrapper
-    def old_async(self, func=None, *,
-                  module=None, max_retry=0, retry_delay=False):
-        if func is None:
-            return functools.partial(self.old_async,
-                                     module=module,
-                                     max_retry=max_retry,
-                                     retry_delay=retry_delay)
-
-        @functools.wraps(func)
-        async def async_func(*args, **kw):
-            task_name = func.__name__
-            if task_name.endswith('_async'):
-                task_name = task_name[:-6]
-            attrs = {
-                'module': module,
-                'task_name': task_name,
-                'max_retry': max_retry,
-                'retry_delay': retry_delay,
-                'retry': 0,
-                'args': args,
-                'kwargs': kw,
-            }
-            await self.write_one(attrs, queued=True)
-        async_func._real = func
         return async_func
 
 
