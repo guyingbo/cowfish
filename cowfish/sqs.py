@@ -15,8 +15,8 @@ class SQSWriter:
     service_name = 'sqs'
     MAX_RETRY = 10
 
-    def __init__(self, queue_name, region_name,
-                 encode_func=None, **pool_kwargs):
+    def __init__(self, queue_name, region_name, encode_func=None,
+                 *, worker_params=None, pool_params=None):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
         self.is_fifo = queue_name.endswith('.fifo')
@@ -25,11 +25,13 @@ class SQSWriter:
             lambda o: base64.b64encode(pickle.dumps(o, 2)).decode('ascii')
         )
         self.jobs = set()
-        self.pool = Pool(self.create_client, **pool_kwargs)
+        pool_params = pool_params or {}
+        self.pool = Pool(self.create_client, **pool_params)
         self.QueueUrl = None
         self.lock = asyncio.Lock()
         self.loop = asyncio.get_event_loop()
-        self.worker = BatchWorker(self.handle)
+        worker_params = worker_params or {}
+        self.worker = BatchWorker(self.handle, **worker_params)
 
     def __repr__(self):
         return '<{}: queue={}, region={}, worker={!r}, pool={!r}>'.format(

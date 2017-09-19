@@ -36,11 +36,13 @@ class Message(dict):
 
 
 class SQSProcesser:
+    service_name = 'sqs'
     MAX_RETRY = 10
 
     def __init__(self, queue_name, region_name, message_handler, *,
                  concurrency=10, visibility_timeout=60, idle_sleep=0,
-                 batch_ops=True):
+                 batch_ops=True,
+                 delete_worker_params=None, change_worker_params=None):
         self.queue_name = queue_name
         self.region_name = region_name
         self.concurrency = concurrency
@@ -59,13 +61,15 @@ class SQSProcesser:
         self.delete_client = self.create_client()
         self.change_client = self.create_client()
         if batch_ops:
+            delete_worker_params = delete_worker_params or {}
             self.delete_worker = BatchWorker(
                 partial(self.delete_batch, self.delete_client),
-                maxsize=30,
+                **delete_worker_params
             )
+            change_worker_params = change_worker_params or {}
             self.change_worker = BatchWorker(
                 partial(self.change_batch, self.change_client),
-                maxsize=30,
+                **change_worker_params
             )
         else:
             self.delete_worker = None
@@ -87,7 +91,8 @@ class SQSProcesser:
         return self.QueueUrl
 
     def create_client(self):
-        return self.session.create_client('sqs', region_name=self.region_name)
+        return self.session.create_client(
+            self.service_name, region_name=self.region_name)
 
     async def run_forever(self):
         async with self.create_client() as client:

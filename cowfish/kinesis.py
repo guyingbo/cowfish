@@ -17,17 +17,17 @@ class Kinesis:
     def __init__(self, stream_name, region_name,
                  encode_func=None, key_func=None,
                  aggr_num=100, flush_interval=60,
-                 **pool_kwargs):
+                 *, worker_params=None, pool_params=None):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
         self.region_name = region_name
         self.encode_func = encode_func or (lambda o: json.dumps(o).encode())
         self.key_func = key_func
         self.jobs = set()
-        self.pool = Pool(self.create_client, **pool_kwargs)
-        self.worker = BatchWorker(
-            self.handle, aggr_num=aggr_num, timeout=flush_interval
-        )
+        pool_params = pool_params or {}
+        self.pool = Pool(self.create_client, **pool_params)
+        worker_params = worker_params or {}
+        self.worker = BatchWorker(self.handle, **worker_params)
 
     def __repr__(self):
         return '<{}: stream={}, region={}, worker={!r}, pool={!r}>'.format(
