@@ -16,7 +16,6 @@ class Kinesis:
 
     def __init__(self, stream_name, region_name,
                  encode_func=None, key_func=None,
-                 aggr_num=100, flush_interval=60,
                  *, worker_params=None, pool_params=None):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
@@ -33,9 +32,6 @@ class Kinesis:
         return '<{}: stream={}, region={}, worker={!r}, pool={!r}>'.format(
                 self.__class__.__name__, self.stream_name,
                 self.region_name, self.worker, self.pool)
-
-    async def put(self, obj):
-        return await self.worker.put(obj)
 
     def create_client(self):
         return self.session.create_client(
@@ -65,15 +61,19 @@ class Kinesis:
         if _seq > self.MAX_RETRY:
             raise Exception('write_batch error: kinesis put_records failed',
                             obj_list)
-        resp = await client.put_records(
-            StreamName=self.stream_name,
-            Records=[
-                {
-                    'PartitionKey': self._get_key(obj),
-                    'Data': self._encode(obj)
-                } for obj in obj_list
-            ]
-        )
+        try:
+            resp = await client.put_records(
+                StreamName=self.stream_name,
+                Records=[
+                    {
+                        'PartitionKey': self._get_key(obj),
+                        'Data': self._encode(obj)
+                    } for obj in obj_list
+                ]
+            )
+        except Exception as e:
+            logger.exception(e)
+            return obj_list
         if resp['FailedRecordCount'] > 0:
             failed_obj_list = [
                 obj_list[i] for i, record in enumerate(resp['Records'])

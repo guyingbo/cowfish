@@ -4,7 +4,7 @@ except ImportError:
     from distutils.core import setup
 import os.path
 import re
-VERSION_RE = re.compile(r'''__version__ = ['"]([0-9.]+)['"]''')
+VERSION_RE = re.compile(r'''__version__ = ['"]([-a-z0-9.]+)['"]''')
 BASE_PATH = os.path.dirname(__file__)
 
 
