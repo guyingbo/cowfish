@@ -13,13 +13,15 @@ class Firehose:
 
     def __init__(self, stream_name, region_name,
                  encode_func=None, delimiter=b'\n',
-                 *, worker_params=None, pool_params=None):
+                 *, worker_params=None, pool_params=None,
+                 client_params=None):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
         self.region_name = region_name
         self.encode_func = encode_func or (lambda o: json.dumps(o).encode())
         self.delimiter = delimiter
         self.jobs = set()
+        self.client_params = client_params or {}
         pool_params = pool_params or {}
         self.pool = Pool(self.create_client, **pool_params)
         worker_params = worker_params or {}
@@ -35,7 +37,8 @@ class Firehose:
 
     def create_client(self):
         return self.session.create_client(
-            self.service_name, region_name=self.region_name
+            self.service_name, region_name=self.region_name,
+            **self.client_params
         )
 
     async def stop(self):

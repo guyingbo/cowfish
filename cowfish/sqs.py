@@ -16,7 +16,8 @@ class SQSWriter:
     MAX_RETRY = 10
 
     def __init__(self, queue_name, region_name, encode_func=None,
-                 *, worker_params=None, pool_params=None):
+                 *, worker_params=None, pool_params=None,
+                 client_params=None):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
         self.is_fifo = queue_name.endswith('.fifo')
@@ -25,6 +26,7 @@ class SQSWriter:
             lambda o: base64.b64encode(pickle.dumps(o, 2)).decode('ascii')
         )
         self.jobs = set()
+        self.client_params = client_params or {}
         pool_params = pool_params or {}
         self.pool = Pool(self.create_client, **pool_params)
         self.QueueUrl = None
@@ -50,7 +52,8 @@ class SQSWriter:
 
     def create_client(self):
         return self.session.create_client(
-            self.service_name, region_name=self.region_name
+            self.service_name, region_name=self.region_name,
+            **self.client_params
         )
 
     async def stop(self):
