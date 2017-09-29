@@ -56,13 +56,22 @@ class Firehose:
         return self.delimiter.join(encoded)
 
     async def handle(self, obj_list):
-        data = self._encode(obj_list)
         client = await self.pool.acquire()
         fut = asyncio.ensure_future(
-            self.pool.auto_release(client, client.put_record(
-                DeliveryStreamName=self.stream_name,
-                Record={'Data': data}
-            ))
+            self.pool.auto_release(
+                client, self.write_batch(client, obj_list)
+            )
         )
         self.jobs.add(fut)
         fut.add_done_callback(self.jobs.remove)
+
+    async def write_batch(self, client, obj_list):
+        try:
+            data = self._encode(obj_list)
+            await client.put_record(
+                DeliveryStreamName=self.stream_name,
+                Record={'Data': data}
+            )
+        except Exception as e:
+            logger.exception(e)
+            return obj_list
