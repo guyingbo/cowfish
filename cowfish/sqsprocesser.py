@@ -7,6 +7,7 @@ import argparse
 import importlib
 import aiobotocore
 from functools import partial
+from . import utils
 from .worker import BatchWorker
 logger = logging.getLogger(__name__)
 __description__ = 'An AWS SQS processer using asyncio/aiobotocore'
@@ -41,15 +42,16 @@ class SQSProcesser:
 
     def __init__(self, queue_name, region_name, message_handler, *,
                  concurrency=10, visibility_timeout=60, idle_sleep=0,
-                 batch_ops=True,
+                 batch_ops=True, client_params=None,
                  delete_worker_params=None, change_worker_params=None):
         self.queue_name = queue_name
-        self.region_name = region_name
         self.concurrency = concurrency
         self.message_handler = message_handler
         self.visibility_timeout = visibility_timeout
         self.idle_sleep = idle_sleep
         self.QueueUrl = None
+        self.client_params = client_params or {}
+        self.client_params['region_name'] = region_name
         self.lock = asyncio.Lock()
         self.session = aiobotocore.get_session()
         self.loop = asyncio.get_event_loop()
@@ -76,8 +78,9 @@ class SQSProcesser:
             self.change_worker = None
 
     def __repr__(self):
-        return '<{}: queue={}, region={}, concurrency={}, working={}>'.format(
-                self.__class__.__name__, self.queue_name, self.region_name,
+        return '<{}: queue={}, {}, concurrency={}, working={}>'.format(
+                self.__class__.__name__, self.queue_name,
+                utils.format_params(self.client_params),
                 self.concurrency, len(self.futures))
 
     async def _get_queue_url(self):
@@ -92,7 +95,7 @@ class SQSProcesser:
 
     def create_client(self):
         return self.session.create_client(
-            self.service_name, region_name=self.region_name)
+            self.service_name, **self.client_params)
 
     async def run_forever(self):
         async with self.create_client() as client:

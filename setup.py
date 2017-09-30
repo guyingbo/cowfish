@@ -29,6 +29,7 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         'aiobotocore',
+        'boto3>=1.4.7',
     ],
     entry_points={
         'console_scripts': [

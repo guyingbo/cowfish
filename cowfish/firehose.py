@@ -3,6 +3,7 @@ import json
 import asyncio
 import logging
 import aiobotocore
+from . import utils
 from .pool import Pool
 from .worker import BatchWorker
 logger = logging.getLogger(__name__)
@@ -17,28 +18,28 @@ class Firehose:
                  client_params=None):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
-        self.region_name = region_name
         self.encode_func = encode_func or (lambda o: json.dumps(o).encode())
         self.delimiter = delimiter
         self.jobs = set()
         self.client_params = client_params or {}
+        self.client_params['region_name'] = region_name
         pool_params = pool_params or {}
         self.pool = Pool(self.create_client, **pool_params)
         worker_params = worker_params or {}
         self.worker = BatchWorker(self.handle, **worker_params)
 
     def __repr__(self):
-        return '<{}: stream={}, region={}, worker={!r}, pool={!r}>'.format(
+        return '<{}: stream={}, {}, worker={!r}, pool={!r}>'.format(
                 self.__class__.__name__, self.stream_name,
-                self.region_name, self.worker, self.pool)
+                utils.format_params(self.client_params),
+                self.worker, self.pool)
 
     async def put(self, obj):
         return await self.worker.put(obj)
 
     def create_client(self):
         return self.session.create_client(
-            self.service_name, region_name=self.region_name,
-            **self.client_params
+            self.service_name, **self.client_params
         )
 
     async def stop(self):
