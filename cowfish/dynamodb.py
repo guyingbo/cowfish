@@ -25,7 +25,7 @@ class Dynamodb:
                 self.pool)
 
     def __getattr__(self, name):
-        return ClientMethodProxy(self.pool, name)
+        return utils.ClientMethodProxy(self.pool, name)
 
     def create_client(self):
         return self.session.create_client(
@@ -37,22 +37,6 @@ class Dynamodb:
 
     def table(self, *args, **kw):
         return Table(self, *args, **kw)
-
-
-class ClientMethodProxy:
-    def __init__(self, pool, name):
-        self._pool = pool
-        self.name = name
-
-    async def __call__(self, *args, **kw):
-        client = await self._pool.acquire()
-        try:
-            return await getattr(client, self.name)(*args, **kw)
-        finally:
-            try:
-                await self._pool.release(client)
-            finally:
-                self._pool = None
 
 
 class Table:
@@ -107,7 +91,6 @@ class Table:
                 k: serialize(v) for k, v in attributes.items()
             })
         kw['Item'] = Item
-        kw['ConditionalOperator'] = str(conditional_operator).upper()
         kw['ReturnValues'] = str(return_values).upper()
         kw['ReturnConsumedCapacity'] = str(return_consumed_capacity).upper()
         kw['ReturnItemCollectionMetrics'] = \
