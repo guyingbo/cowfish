@@ -1,0 +1,131 @@
+{
+  "app": {
+    "bundle": "com.grindrapp.android",
+    "cat": [
+      "IAB1",
+      "IAB24",
+      "entertainment",
+      "social_networking"
+    ],
+    "id": "agltb3B1Yi1pbmNyDAsSA0FwcBjRiOYSDA",
+    "name": "Grindr",
+    "publisher": {
+      "id": "agltb3B1Yi1pbmNyIgsSB0FjY291bnQiFTEwMTEyNzQwOTg4Njk0NTM4Njc4NAw",
+      "name": "Grindr LLC"
+    },
+    "ver": "2.2.7.1"
+  },
+  "at": 2,
+  "badv": [
+    "adsmovil.com",
+    "aetna.com/",
+    "bipmod.com",
+    "bravefrontier.mobinlife.com",
+    "club1616.com",
+    "en.lovoo.com",
+    "flirtfinder.mobi",
+    "gagnerdescadeaux.com",
+    "gameofwar-fireage.addmired",
+    "inc.com",
+    "getvgl.com",
+    "godlife.com",
+    "klout.com",
+    "lovedgames.com",
+    "lovoo.com",
+    "machinezone.com",
+    "match.com",
+    "riteaid.com",
+    "skout.com",
+    "spotify.com",
+    "spotify.spotify.com",
+    "tesco.com",
+    "topoffers.mobi",
+    "t.zoosk.com",
+    "vgl.com",
+    "williamhill.com",
+    "wooga.com",
+    "zoosk.com"
+  ],
+  "bcat": [
+    "IAB6-7",
+    "IAB7-3",
+    "IAB7-28",
+    "IAB7-30",
+    "IAB7-39",
+    "IAB9-7",
+    "IAB9-9",
+    "IAB9-30",
+    "IAB14-1",
+    "IAB14-2",
+    "IAB23",
+    "IAB23-4",
+    "IAB23-5",
+    "IAB23-7",
+    "IAB23-9",
+    "IAB25",
+    "IAB26"
+  ],
+  "device": {
+    "carrier": "722-310",
+    "connectiontype": 3,
+    "dnt": 0,
+    "geo": {
+      "city": "Federal",
+      "country": "ARG",
+      "lat": -32.941688,
+      "lon": -60.641304,
+      "region": "08"
+    },
+    "h": 2208,
+    "ifa": "03fc4d10-7ba4-460f-952d-cd3bdf6b7715",
+    "ip": "186.13.6.240",
+    "js": 1,
+    "language": "es",
+    "lmt": 1,
+    "make": "samsung",
+    "model": "SM-G710",
+    "os": "Android",
+    "osv": "4.3",
+    "ua": "Mozilla/5.0 (Linux; U; Android 4.3; es-es; SM-G710 Build/JLS36C) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30",
+    "w": 1242
+  },
+  "id": "b04f1d6a-6a60-4659-9345-25d508d3ba88",
+  "imp": [
+    {
+      "banner": {
+        "api": [
+          3
+        ],
+        "battr": [
+          2,
+          8,
+          9,
+          10,
+          14,
+          6
+        ],
+        "btype": [
+          4
+        ],
+        "h": 50,
+        "pos": 1,
+        "w": 320
+      },
+      "bidfloor": 0.03,
+      "displaymanager": "mopub",
+      "displaymanagerver": "3.2.2",
+      "ext": {
+        "brsrclk": 1
+      },
+      "id": "1",
+      "instl": 0,
+      "secure": 0,
+      "tagid": "agltb3B1Yi1pbmNyDQsSBFNpdGUYtebmEgw"
+    }
+  ],
+  "user": {
+    "gender": "M",
+    "keywords": "m_age:40,m_ethnicity:7",
+    "yob": 1977
+  }
+}
