@@ -85,6 +85,7 @@ class Table:
                        return_consumed_capacity=None,
                        return_item_collection_metrics=None):
         kw = {}
+        kw['TableName'] = self.name
         Item = self._get_key(hash_key, range_key)
         if attributes:
             Item.update({
