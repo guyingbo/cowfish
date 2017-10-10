@@ -6,8 +6,6 @@ import asyncio
 import argparse
 import importlib
 import aiobotocore
-from functools import partial
-from . import utils
 from .worker import BatchWorker
 logger = logging.getLogger(__name__)
 __description__ = 'An AWS SQS processer using asyncio/aiobotocore'
@@ -50,8 +48,8 @@ class SQSProcesser:
         self.visibility_timeout = visibility_timeout
         self.idle_sleep = idle_sleep
         self.QueueUrl = None
-        self.client_params = client_params or {}
-        self.client_params['region_name'] = region_name
+        client_params = client_params or {}
+        client_params['region_name'] = region_name
         self.lock = asyncio.Lock()
         self.session = aiobotocore.get_session()
         self.loop = asyncio.get_event_loop()
@@ -60,62 +58,52 @@ class SQSProcesser:
         self.loop.add_signal_handler(signal.SIGTERM, self.quit_event.set)
         self.semaphore = asyncio.Semaphore(concurrency)
         self.futures = set()
-        self.delete_client = self.create_client()
-        self.change_client = self.create_client()
+        self.client = self.session.create_client(
+            self.service_name, **client_params)
         if batch_ops:
             delete_worker_params = delete_worker_params or {}
             self.delete_worker = BatchWorker(
-                partial(self.delete_batch, self.delete_client),
-                **delete_worker_params
+                self.delete_batch, **delete_worker_params
             )
             change_worker_params = change_worker_params or {}
             self.change_worker = BatchWorker(
-                partial(self.change_batch, self.change_client),
-                **change_worker_params
+                self.change_batch, **change_worker_params
             )
         else:
             self.delete_worker = None
             self.change_worker = None
 
     def __repr__(self):
-        return '<{}: queue={}, {}, concurrency={}, working={}>'.format(
+        return '<{}: queue={}, client={}, concurrency={}, working={}>'.format(
                 self.__class__.__name__, self.queue_name,
-                utils.format_params(self.client_params),
-                self.concurrency, len(self.futures))
+                self.client, self.concurrency, len(self.futures))
 
     async def _get_queue_url(self):
         if self.QueueUrl is None:
             async with self.lock:
-                async with self.create_client() as client:
-                    resp = await client.get_queue_url(
-                            QueueName=self.queue_name
-                        )
-                    self.QueueUrl = resp['QueueUrl']
+                resp = await self.client.get_queue_url(
+                        QueueName=self.queue_name
+                    )
+                self.QueueUrl = resp['QueueUrl']
         return self.QueueUrl
 
-    def create_client(self):
-        return self.session.create_client(
-            self.service_name, **self.client_params)
-
     async def run_forever(self):
-        async with self.create_client() as client:
-            while not self.quit_event.is_set():
-                try:
-                    await self._fetch_messages(client)
-                except Exception as e:
-                    logger.exception(e)
-                    continue
+        while not self.quit_event.is_set():
+            try:
+                await self._fetch_messages()
+            except Exception as e:
+                logger.exception(e)
+                continue
         if self.change_worker:
             await self.change_worker.stop()
-        self.change_client.close()
         if self.delete_worker:
             await self.delete_worker.stop()
-        self.delete_client.close()
+        self.client.close()
         if self.futures:
             await asyncio.wait(self.futures)
 
-    async def _fetch_messages(self, client):
-        response = await client.receive_message(
+    async def _fetch_messages(self):
+        response = await self.client.receive_message(
             QueueUrl=(await self._get_queue_url()),
             AttributeNames=['ApproximateReceiveCount'],
             MessageAttributeNames=['All'],
@@ -153,13 +141,13 @@ class SQSProcesser:
         finally:
             self.semaphore.release()
 
-    async def change_batch(self, client, messages, _seq=0):
+    async def change_batch(self, messages, _seq=0):
         if _seq > 0:
             await asyncio.sleep(0.1 * (2 ** _seq))
         if _seq > self.MAX_RETRY:
             raise Exception('change_message_visibility_batch failed', messages)
         try:
-            resp = await client.change_message_visibility_batch(
+            resp = await self.client.change_message_visibility_batch(
                 QueueUrl=(await self._get_queue_url()),
                 Entries=[
                     {
@@ -180,27 +168,26 @@ class SQSProcesser:
                 messages[int(d['Id'])] for d in resp['Failed']
             ]
             return await self.change_batch(
-                client, server_failed_messages, _seq+1
+                server_failed_messages, _seq+1
             )
 
     async def change_one(self, message, visibility_timeout):
         if self.change_worker:
             await self.change_worker.put((message, visibility_timeout))
             return
-        async with self.create_client() as client:
-            return await client.change_message_visibility(
-                QueueUrl=(await self._get_queue_url()),
-                ReceiptHandle=message['ReceiptHandle'],
-                VisibilityTimeout=visibility_timeout
-            )
+        return await self.client.change_message_visibility(
+            QueueUrl=(await self._get_queue_url()),
+            ReceiptHandle=message['ReceiptHandle'],
+            VisibilityTimeout=visibility_timeout
+        )
 
-    async def delete_batch(self, client, messages, _seq=0):
+    async def delete_batch(self, messages, _seq=0):
         if _seq > 0:
             await asyncio.sleep(0.1 * (2 ** _seq))
         if _seq > self.MAX_RETRY:
             raise Exception('delete_message_batch failed', messages)
         try:
-            resp = await client.delete_message_batch(
+            resp = await self.client.delete_message_batch(
                 QueueUrl=(await self._get_queue_url()),
                 Entries=[
                     {
@@ -220,18 +207,17 @@ class SQSProcesser:
                 if not d['SenderFault']
             ]
             return await self.delete_batch(
-                client, server_failed_messages, _seq+1
+                server_failed_messages, _seq+1
             )
 
     async def delete_one(self, message):
         if self.delete_worker:
             await self.delete_worker.put(message)
             return
-        async with self.create_client() as client:
-            return await client.delete_message(
-                QueueUrl=(await self._get_queue_url()),
-                ReceiptHandle=message['ReceiptHandle']
-            )
+        return await self.client.delete_message(
+            QueueUrl=(await self._get_queue_url()),
+            ReceiptHandle=message['ReceiptHandle']
+        )
 
     def start(self):
         try:

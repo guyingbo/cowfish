@@ -28,8 +28,7 @@ setup(
     packages=['cowfish'],
     python_requires='>=3.5',
     install_requires=[
-        'aiobotocore',
-        'boto3>=1.4.7',
+        'aiobotocore==0.4.5',
     ],
     entry_points={
         'console_scripts': [

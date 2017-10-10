@@ -9,3 +9,6 @@ A useful asynchronous library bases on aiobotocore
 ~~~
 python -m cowfish.sqsprocesser queue_name region_name
 ~~~
+
+## Dynamodb
+use [aioboto3](https://github.com/terrycain/aioboto3) instead.
