@@ -29,16 +29,16 @@ class Pool:
         async with self._cond:
             while self._pool:
                 client = self._pool.popleft()
-                client.close()
+                await client.close()
 
     async def _do_close(self):
         async with self._cond:
             assert self._acquiring == 0, self._acquiring
             while self._pool:
                 client = self._pool.popleft()
-                client.close()
+                await client.close()
             for client in self._using:
-                client.close()
+                await client.close()
             self._using.clear()
 
     async def close(self):

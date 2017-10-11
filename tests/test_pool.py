@@ -4,7 +4,7 @@ loop = asyncio.get_event_loop()
 
 
 class Client:
-    def close(self):
+    async def close(self):
         pass
 
 
