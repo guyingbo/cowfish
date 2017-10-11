@@ -5,19 +5,24 @@ logger = logging.getLogger(__name__)
 
 
 class BatchWorker:
-    def __init__(self, handler, maxsize=0, aggr_num=10, timeout=5):
+    def __init__(self, handler, *, maxsize=0, aggr_num=10, timeout=5,
+                 concurrency=10):
         self.queue = asyncio.Queue(maxsize)
         self.handler = handler
         self.aggr_num = aggr_num
         self.timeout = timeout
+        self.concurrency = concurrency
+        self.semaphore = asyncio.Semaphore(concurrency)
         self.quit = object()
         self.shutdown = False
         self.fut = None
+        self.futures = set()
         self.start()
 
     def __repr__(self):
-        return '<{}: qsize={}>'.format(
-            self.__class__.__name__, self.queue.qsize()
+        return '<{}: qsize={}, concurrency={}, working={}>'.format(
+            self.__class__.__name__, self.queue.qsize(), self.concurrency,
+            len(self.futures)
         )
 
     @property
@@ -58,6 +63,15 @@ class BatchWorker:
             obj_list = await self._get_obj_list()
             if not obj_list:
                 continue
+            await self.semaphore.acquire()
+            fut = asyncio.ensure_future(self.handle(obj_list))
+            self.futures.add(fut)
+            fut.add_done_callback(self.futures.remove)
+        if self.futures:
+            await asyncio.wait(self.futures)
+
+    async def handle(self, obj_list):
+        try:
             try:
                 result = self.handler(obj_list)
                 if asyncio.iscoroutine(result):
@@ -67,3 +81,5 @@ class BatchWorker:
                         await self.queue.put(obj)
             except Exception as e:
                 logger.exception(e)
+        finally:
+            self.semaphore.release()
