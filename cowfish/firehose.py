@@ -33,7 +33,7 @@ class Firehose:
     async def stop(self):
         timestamp = time.time()
         await self.worker.stop()
-        self.client.close()
+        await self.client.close()
         cost = time.time() - timestamp
         logger.info('{0!r} stopped in {1:.1f} seconds'.format(self, cost))
 

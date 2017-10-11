@@ -5,8 +5,6 @@ import logging
 import asyncio
 import functools
 import aiobotocore
-from . import utils
-from .pool import Pool
 from .worker import BatchWorker
 loop = asyncio.get_event_loop()
 logger = logging.getLogger(__name__)
@@ -17,67 +15,45 @@ class SQSWriter:
     MAX_RETRY = 10
 
     def __init__(self, queue_name, region_name, encode_func=None,
-                 *, worker_params=None, pool_params=None,
-                 client_params=None):
+                 *, worker_params=None, client_params=None):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
         self.is_fifo = queue_name.endswith('.fifo')
         self.encode_func = encode_func or (
             lambda o: base64.b64encode(pickle.dumps(o, 2)).decode('ascii')
         )
-        self.jobs = set()
-        self.client_params = client_params or {}
-        self.client_params['region_name'] = region_name
-        pool_params = pool_params or {}
-        self.pool = Pool(self.create_client, **pool_params)
+        client_params = client_params or {}
+        client_params['region_name'] = region_name
+        self.client = self.session.create_client(
+            self.service_name, **client_params)
         self.QueueUrl = None
         self.lock = asyncio.Lock()
         self.loop = asyncio.get_event_loop()
         worker_params = worker_params or {}
-        self.worker = BatchWorker(self.handle, **worker_params)
+        self.worker = BatchWorker(self.write_batch, **worker_params)
 
     def __repr__(self):
-        return '<{}: queue={}, {}, worker={!r}, pool={!r}>'.format(
-                self.__class__.__name__, self.queue_name,
-                utils.format_params(self.client_params),
-                self.worker, self.pool)
+        return '<{}: queue={}, worker={!r}>'.format(
+                self.__class__.__name__, self.queue_name, self.worker)
 
     async def _get_queue_url(self):
         if self.QueueUrl is None:
             async with self.lock:
-                async with self.pool.get() as client:
-                    resp = await client.get_queue_url(
-                            QueueName=self.queue_name
-                        )
-                    self.QueueUrl = resp['QueueUrl']
+                resp = await self.client.get_queue_url(
+                        QueueName=self.queue_name
+                    )
+                self.QueueUrl = resp['QueueUrl']
         return self.QueueUrl
-
-    def create_client(self):
-        return self.session.create_client(
-            self.service_name, **self.client_params
-        )
 
     async def stop(self):
         timestamp = time.time()
         await self.worker.stop()
-        if self.jobs:
-            await asyncio.wait(self.jobs)
-        await self.pool.close()
+        await self.client.close()
         cost = time.time() - timestamp
         logger.info('{0!r} stopped in {1:.1f} seconds'.format(self, cost))
 
     def _encode(self, obj):
         return self.encode_func(obj)
-
-    async def handle(self, obj_list):
-        client = await self.pool.acquire()
-        fut = asyncio.ensure_future(
-            self.pool.auto_release(
-                client, self.write_batch(client, obj_list)
-            )
-        )
-        self.jobs.add(fut)
-        fut.add_done_callback(self.jobs.remove)
 
     async def write_one(self, record, delay_seconds=0,
                         deduplication_id=None, group_id=None,
@@ -101,14 +77,13 @@ class SQSWriter:
             await self.worker.put(message)
             return
         try:
-            async with self.pool.get() as client:
-                return await client.send_message(
-                    QueueUrl=(await self._get_queue_url()),
-                    MessageBody=self._encode(record),
-                    DelaySeconds=delay_seconds,
-                    MessageAttributes=attributes,
-                    **message['params'],
-                )
+            return await self.client.send_message(
+                QueueUrl=(await self._get_queue_url()),
+                MessageBody=self._encode(record),
+                DelaySeconds=delay_seconds,
+                MessageAttributes=attributes,
+                **message['params'],
+            )
         except Exception as e:
             logger.exception(e)
             return await self.write_one(
@@ -116,7 +91,7 @@ class SQSWriter:
                     deduplication_id=deduplication_id, group_id=group_id,
                     queued=False, _seq=_seq+1, **attributes)
 
-    async def write_batch(self, client, obj_list, _seq=0):
+    async def write_batch(self, obj_list, _seq=0):
         if _seq > 0:
             await asyncio.sleep(0.1 * (2 ** _seq))
         if _seq > self.MAX_RETRY - 1:
@@ -132,7 +107,7 @@ class SQSWriter:
             } for i, message in enumerate(obj_list)
         ]
         try:
-            resp = await client.send_message_batch(
+            resp = await self.client.send_message_batch(
                 QueueUrl=(await self._get_queue_url()),
                 Entries=Entries
             )
@@ -147,7 +122,7 @@ class SQSWriter:
                 if not d['SenderFault']
             ]
             return await self.write_batch(
-                client, failed_obj_list, _seq=_seq + 1
+                failed_obj_list, _seq=_seq + 1
             )
 
     def async_rpc(self, func=None, *, delay_seconds=0,

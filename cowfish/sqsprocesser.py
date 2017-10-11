@@ -98,7 +98,7 @@ class SQSProcesser:
             await self.change_worker.stop()
         if self.delete_worker:
             await self.delete_worker.stop()
-        self.client.close()
+        await self.client.close()
         if self.futures:
             await asyncio.wait(self.futures)
 
