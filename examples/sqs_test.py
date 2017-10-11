@@ -1,5 +1,4 @@
 import sys
-import json
 import time
 import signal
 import asyncio
@@ -9,7 +8,7 @@ loop = asyncio.get_event_loop()
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
-writer = SQSWriter('gyb', region_name='us-west-1', maxsize=10)
+writer = SQSWriter('gyb', region_name='us-west-1')
 
 
 @writer.async_rpc
@@ -17,8 +16,10 @@ async def foo(a):
     pass
 
 
-with open('a.json') as f:
-    obj = json.loads(f.read())
+obj = {
+    'name': 'gyb',
+    'value': 'haha',
+}
 
 
 async def show():
@@ -37,7 +38,7 @@ async def go():
     asyncio.gather(asyncio.sleep(1))
     while not done2.is_set() and timeout > 0:
         timestamp = time.time()
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.005)
         await writer.write_one(obj, queued=True)
         timeout -= time.time() - timestamp
 
