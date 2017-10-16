@@ -5,8 +5,12 @@ async def cancel_on_event(coro, event):
     event_task = asyncio.ensure_future(event.wait())
     done, pending = await asyncio.wait(
         [event_task, coro], return_when=asyncio.FIRST_COMPLETED)
-    pending.pop().cancel()
-    return done.pop().result()
+    if pending:
+        pending.pop().cancel()
+    while done:
+        task = done.pop()
+        if task is not event_task:
+            return task.result()
 
 
 def format_params(params):
