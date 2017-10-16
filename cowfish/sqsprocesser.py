@@ -6,6 +6,7 @@ import asyncio
 import argparse
 import importlib
 import aiobotocore
+from . import utils
 from .worker import BatchWorker
 logger = logging.getLogger(__name__)
 __description__ = 'An AWS SQS processer using asyncio/aiobotocore'
@@ -48,6 +49,9 @@ class SQSProcesser:
         self.visibility_timeout = visibility_timeout
         self.idle_sleep = idle_sleep
         self.QueueUrl = None
+        self.hooks = {
+            'after_server_stop': set(),
+        }
         client_params = client_params or {}
         client_params['region_name'] = region_name
         self.lock = asyncio.Lock()
@@ -94,16 +98,16 @@ class SQSProcesser:
             except Exception as e:
                 logger.exception(e)
                 continue
+        if self.futures:
+            await asyncio.wait(self.futures)
         if self.change_worker:
             await self.change_worker.stop()
         if self.delete_worker:
             await self.delete_worker.stop()
-        if self.futures:
-            await asyncio.wait(self.futures)
         await self.client.close()
 
     async def _fetch_messages(self):
-        response = await self.client.receive_message(
+        job = self.client.receive_message(
             QueueUrl=(await self._get_queue_url()),
             AttributeNames=['ApproximateReceiveCount'],
             MessageAttributeNames=['All'],
@@ -111,6 +115,9 @@ class SQSProcesser:
             VisibilityTimeout=self.visibility_timeout,
             WaitTimeSeconds=20
         )
+        response = await utils.cancel_on_event(job, self.quit_event)
+        if self.quit_event.is_set():
+            return
         if 'Messages' not in response and self.idle_sleep > 0:
             await asyncio.sleep(self.idle_sleep)
         if 'Messages' in response:
@@ -219,10 +226,21 @@ class SQSProcesser:
             ReceiptHandle=message['ReceiptHandle']
         )
 
+    def after_server_stop(self, func):
+        self.hooks['after_server_stop'].add(func)
+
     def start(self):
         try:
             self.loop.run_until_complete(self.run_forever())
         finally:
+            try:
+                for func in self.hooks['after_server_stop']:
+                    if asyncio.iscoroutinefunction(func):
+                        self.loop.run_until_complete(func(self.loop))
+                    else:
+                        func(self.loop)
+            except Exception as e:
+                logger.exception(e)
             self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             self.loop.close()
 
