@@ -42,7 +42,8 @@ class SQSProcesser:
     def __init__(self, queue_name, region_name, message_handler, *,
                  concurrency=10, visibility_timeout=60, idle_sleep=0,
                  batch_ops=True, client_params=None,
-                 delete_worker_params=None, change_worker_params=None):
+                 delete_worker_params=None, change_worker_params=None,
+                 loop=None):
         self.queue_name = queue_name
         self.concurrency = concurrency
         self.message_handler = message_handler
@@ -56,7 +57,7 @@ class SQSProcesser:
         client_params['region_name'] = region_name
         self.lock = asyncio.Lock()
         self.session = aiobotocore.get_session()
-        self.loop = asyncio.get_event_loop()
+        self.loop = loop or asyncio.get_event_loop()
         self.quit_event = asyncio.Event()
         self.loop.add_signal_handler(signal.SIGINT, self.quit_event.set)
         self.loop.add_signal_handler(signal.SIGTERM, self.quit_event.set)

@@ -6,7 +6,6 @@ import asyncio
 import functools
 import aiobotocore
 from .worker import BatchWorker
-loop = asyncio.get_event_loop()
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +27,6 @@ class SQSWriter:
             self.service_name, **client_params)
         self.QueueUrl = None
         self.lock = asyncio.Lock()
-        self.loop = asyncio.get_event_loop()
         worker_params = worker_params or {}
         self.worker = BatchWorker(self.write_batch, **worker_params)
 
