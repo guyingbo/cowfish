@@ -1,10 +1,10 @@
 # cowfish
 
 [![Build Status](https://travis-ci.org/guyingbo/cowfish.svg?branch=master)](https://travis-ci.org/guyingbo/cowfish)
-[![PyPI](https://img.shields.io/pypi/pyversions/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
-[![PyPI](https://img.shields.io/pypi/v/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
-[![PyPI](https://img.shields.io/pypi/format/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
-[![PyPI](https://img.shields.io/pypi/l/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
+[![Python Version](https://img.shields.io/pypi/pyversions/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
+[![Version](https://img.shields.io/pypi/v/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
+[![Format](https://img.shields.io/pypi/format/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
+[![License](https://img.shields.io/pypi/l/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
 
 A useful asynchronous library bases on aiobotocore
 
