@@ -15,9 +15,15 @@ with open(os.path.join(BASE_PATH, 'cowfish', '__init__.py')) as f:
         raise RuntimeError('Unable to determine version.')
 
 
+with open(os.path.join(BASE_PATH, 'README.md')) as readme:
+    long_description = readme.read()
+
+
 setup(
     name='cowfish',
     description='A useful asynchronous library bases on aiobotocore',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     license='MIT',
     version=version,
     author='Yingbo Gu',

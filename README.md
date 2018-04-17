@@ -8,11 +8,22 @@
 
 A useful asynchronous library bases on aiobotocore
 
-## usage
+## Usage
 
 ~~~
 python -m cowfish.sqsprocesser queue_name region_name
 ~~~
 
-## Dynamodb
+## Examples
+
+~~~python
+firehose = Firehose(name, worker_params={'maxsize': 1000})
+
+async def go():
+    await firehose.put({'a': 3, 'b': 4})
+    ...
+    await firehose.stop()
+~~~
+
+## For dynamodb
 use [aioboto3](https://github.com/terrycain/aioboto3) instead.
