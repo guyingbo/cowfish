@@ -86,10 +86,11 @@ class SQSProcesser:
     async def _get_queue_url(self):
         if self.QueueUrl is None:
             async with self.lock:
-                resp = await self.client.get_queue_url(
-                        QueueName=self.queue_name
-                    )
-                self.QueueUrl = resp['QueueUrl']
+                if self.QueueUrl is None:
+                    resp = await self.client.get_queue_url(
+                            QueueName=self.queue_name
+                        )
+                    self.QueueUrl = resp['QueueUrl']
         return self.QueueUrl
 
     async def run_forever(self):
