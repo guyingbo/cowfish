@@ -34,7 +34,7 @@ setup(
     packages=['cowfish'],
     python_requires='>=3.5',
     install_requires=[
-        'aiobotocore>=0.4.5',
+        'aiobotocore>=0.7.0',
         'async-timeout',
     ],
     entry_points={
