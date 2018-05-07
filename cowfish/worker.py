@@ -1,6 +1,7 @@
 import time
 import logging
 import asyncio
+import async_timeout
 logger = logging.getLogger(__name__)
 
 
@@ -39,7 +40,7 @@ class BatchWorker:
         logger.info('Stopping {0!r}'.format(self))
         await self.queue.put(self.quit)
         if self.fut:
-            await asyncio.wait_for(self.fut, None)
+            await self.fut
 
     async def _get_obj_list(self):
         obj_list = []
@@ -47,7 +48,8 @@ class BatchWorker:
         while timeout > 0 and len(obj_list) < self.aggr_num:
             timestamp = time.time()
             try:
-                obj = await asyncio.wait_for(self.queue.get(), timeout)
+                async with async_timeout.timeout(timeout):
+                    obj = await self.queue.get()
             except asyncio.TimeoutError:
                 break
             if obj is self.quit:

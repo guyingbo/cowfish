@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 aiobotocore = "*"
+async-timeout = "*"
 
 [dev-packages]
 

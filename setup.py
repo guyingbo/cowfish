@@ -35,6 +35,7 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         'aiobotocore>=0.4.5',
+        'async-timeout',
     ],
     entry_points={
         'console_scripts': [
