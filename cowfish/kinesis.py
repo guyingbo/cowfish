@@ -118,3 +118,10 @@ class CompactKinesis(Kinesis):
             await self.write_one(payload, queued=True)
         else:
             self.buffer.extend(packed)
+
+    async def stop(self):
+        if self.buffer:
+            payload = bytes(self.buffer)
+            self.buffer.clear()
+            await self.write_one(payload, queued=True)
+        await super().stop()
