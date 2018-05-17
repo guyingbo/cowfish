@@ -6,6 +6,10 @@ import asyncio
 import logging
 import aiobotocore
 from .worker import BatchWorker
+try:
+    import msgpack
+except ImportError:
+    pass
 logger = logging.getLogger(__name__)
 
 
@@ -90,3 +94,27 @@ class Kinesis:
         except Exception as e:
             logger.exception(e)
             return await self.write_one(obj, queued=False, _seq=_seq + 1)
+
+
+class CompactKinesis(Kinesis):
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.buffer = bytearray()
+        try:
+            self.packer = msgpack.Packer()
+        except NameError:
+            raise ImportError('need msgpack')
+        self.bufmax = 1024*25
+
+    def _encode(self, obj):
+        return obj
+
+    async def write(self, obj):
+        packed = self.packer.pack(obj)
+        if len(self.buffer) + len(packed) >= self.bufmax:
+            payload = bytes(self.buffer)
+            self.buffer.clear()
+            self.buffer.extend(packed)
+            await self.write_one(payload, queue=True)
+        else:
+            self.buffer.extend(packed)
