@@ -115,6 +115,6 @@ class CompactKinesis(Kinesis):
             payload = bytes(self.buffer)
             self.buffer.clear()
             self.buffer.extend(packed)
-            await self.write_one(payload, queue=True)
+            await self.write_one(payload, queued=True)
         else:
             self.buffer.extend(packed)

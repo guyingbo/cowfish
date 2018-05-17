@@ -8,6 +8,9 @@ def test_kinesis():
     loop.run_until_complete(kinesis.stop())
 
 
-def test_compact():
-    kinesis = CompactKinesis('fake', 'fake')
-    loop.run_until_complete(kinesis.stop())
+def test_compact_kinesis():
+    try:
+        kinesis = CompactKinesis('fake', 'fake')
+        loop.run_until_complete(kinesis.stop())
+    except ImportError:
+        pass
