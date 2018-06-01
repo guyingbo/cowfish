@@ -119,6 +119,12 @@ class CompactKinesis(Kinesis):
         else:
             self.buffer.extend(packed)
 
+    async def flush(self):
+        if self.buffer:
+            payload = bytes(self.buffer)
+            self.buffer.clear()
+            await self.write_one(payload, queued=True)
+
     async def write_fluent(self, label, data):
         timestamp = int(time.time())
         packet = (label, timestamp, data)
