@@ -109,7 +109,7 @@ class CompactKinesis(Kinesis):
     def _encode(self, obj):
         return obj
 
-    async def write(self, obj):
+    async def write(self, obj, flush=False):
         packed = self.packer.pack(obj)
         if len(self.buffer) + len(packed) >= self.bufmax:
             payload = bytes(self.buffer)
@@ -118,6 +118,10 @@ class CompactKinesis(Kinesis):
             await self.write_one(payload, queued=True)
         else:
             self.buffer.extend(packed)
+            if flush and self.buffer:
+                payload = bytes(self.buffer)
+                self.buffer.clear()
+                await self.write_one(payload, queued=True)
 
     async def flush(self):
         if self.buffer:
