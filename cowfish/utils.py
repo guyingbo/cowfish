@@ -1,10 +1,11 @@
 import asyncio
 
 
-async def cancel_on_event(coro, event):
+async def cancel_on_event(coro, event: asyncio.Event):
     event_task = asyncio.ensure_future(event.wait())
     done, pending = await asyncio.wait(
-        [event_task, coro], return_when=asyncio.FIRST_COMPLETED)
+        [event_task, coro], return_when=asyncio.FIRST_COMPLETED
+    )
     if pending:
         pending.pop().cancel()
     while done:
@@ -13,12 +14,12 @@ async def cancel_on_event(coro, event):
             return task.result()
 
 
-def format_params(params):
-    return ', '.join('{}={}'.format(k, v) for k, v in params.items())
+def format_params(params: dict):
+    return ", ".join("{}={}".format(k, v) for k, v in params.items())
 
 
 class ClientMethodProxy:
-    def __init__(self, pool, name):
+    def __init__(self, pool, name: str):
         self._pool = pool
         self.name = name
 

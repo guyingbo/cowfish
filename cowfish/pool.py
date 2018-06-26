@@ -3,7 +3,7 @@ import collections
 
 
 class Pool:
-    def __init__(self, factory, minsize=1, maxsize=10):
+    def __init__(self, factory: "function", minsize: int = 1, maxsize: int = 10):
         self.factory = factory
         self.minsize = minsize
         self.maxsize = maxsize
@@ -15,7 +15,7 @@ class Pool:
         self._fill_free(override_min=False)
 
     def __repr__(self):
-        return '<{}: size={}>'.format(self.__class__.__name__, self.size)
+        return "<{}: size={}>".format(self.__class__.__name__, self.size)
 
     @property
     def size(self):
@@ -72,7 +72,7 @@ class Pool:
         async with self._cond:
             self._cond.notify()
 
-    def _fill_free(self, *, override_min):
+    def _fill_free(self, *, override_min: bool):
         while self.size < self.minsize:
             self._acquiring += 1
             try:
@@ -102,7 +102,7 @@ class Pool:
 
 
 class AsyncClientContextManager:
-    __slots__ = ('_pool', '_client')
+    __slots__ = ("_pool", "_client")
 
     def __init__(self, pool):
         self._pool = pool
