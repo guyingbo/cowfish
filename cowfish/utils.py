@@ -14,7 +14,7 @@ async def cancel_on_event(coro, event: asyncio.Event):
             return task.result()
 
 
-def format_params(params: dict):
+def format_params(params: dict) -> str:
     return ", ".join("{}={}".format(k, v) for k, v in params.items())
 
 

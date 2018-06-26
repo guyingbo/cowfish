@@ -49,7 +49,7 @@ class Firehose:
         cost = time.time() - timestamp
         logger.info("{0!r} stopped in {1:.1f} seconds".format(self, cost))
 
-    def _encode(self, obj_list: list):
+    def _encode(self, obj_list: list) -> bytes:
         encoded = [self.encode_func(obj) for obj in obj_list]
         encoded.append(b"")
         return self.delimiter.join(encoded)

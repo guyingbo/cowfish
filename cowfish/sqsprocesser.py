@@ -14,7 +14,7 @@ __description__ = "An AWS SQS processer using asyncio/aiobotocore"
 
 
 class SQSRetry(Exception):
-    def __init__(self, *, max_times, after):
+    def __init__(self, *, max_times: int, after: int):
         self.max_times = max_times
         self.seconds_later = after
 
@@ -91,7 +91,7 @@ class SQSProcesser:
             len(self.futures),
         )
 
-    async def _get_queue_url(self):
+    async def _get_queue_url(self) -> str:
         if self.QueueUrl is None:
             async with self.lock:
                 if self.QueueUrl is None:
@@ -144,9 +144,8 @@ class SQSProcesser:
                     await result
             except Exception as e:
                 if e.__class__.__name__ == SQSRetry.__name__:
-                    if (
-                        int(message.attributes.get("ApproximateReceiveCount", 1))
-                        <= e.max_times
+                    if e.max_times >= int(
+                        message.attributes.get("ApproximateReceiveCount", 1)
                     ):
                         await self.change_one(message, e.seconds_later)
                         delete = False
@@ -244,7 +243,7 @@ class SQSProcesser:
             self.loop.close()
 
 
-def import_function(path: str):
+def import_function(path: str) -> "function":
     module_path, func_name = path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, func_name)

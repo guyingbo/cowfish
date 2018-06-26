@@ -50,7 +50,7 @@ class Kinesis:
         cost = time.time() - timestamp
         logger.info("{0!r} stopped in {1:.1f} seconds".format(self, cost))
 
-    def _get_key(self, obj):
+    def _get_key(self, obj) -> bytes:
         if self.key_func is None:
             return base64.b64encode(os.urandom(24)).decode("ascii")
         return self.key_func(obj)

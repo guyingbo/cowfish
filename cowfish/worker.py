@@ -7,6 +7,10 @@ logger = logging.getLogger(__package__)
 
 
 class BatchWorker:
+    """
+    BatchWorker holds some amount of objects for a few seconds before sending them out.
+    """
+
     def __init__(
         self,
         handler,
@@ -37,7 +41,7 @@ class BatchWorker:
         )
 
     @property
-    def qsize(self):
+    def qsize(self) -> int:
         return self.queue.qsize()
 
     async def put(self, obj):
@@ -52,7 +56,7 @@ class BatchWorker:
         if self.fut:
             await self.fut
 
-    async def _get_obj_list(self):
+    async def _get_obj_list(self) -> list:
         obj_list = []
         timeout = self.timeout
         while timeout > 0 and len(obj_list) < self.aggr_num:

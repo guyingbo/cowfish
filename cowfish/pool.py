@@ -18,11 +18,11 @@ class Pool:
         return "<{}: size={}>".format(self.__class__.__name__, self.size)
 
     @property
-    def size(self):
+    def size(self) -> int:
         return self.freesize + len(self._using) + self._acquiring
 
     @property
-    def freesize(self):
+    def freesize(self) -> int:
         return len(self._pool)
 
     async def clear(self):
