@@ -21,7 +21,7 @@ class SQSWriter:
         encode_func: "function" = None,
         *,
         worker_params: dict = None,
-        client_params: dict = None,
+        client_params: dict = None
     ):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
@@ -68,7 +68,7 @@ class SQSWriter:
         group_id=None,
         queued: bool = False,
         _seq: int = 0,
-        **attributes,
+        **attributes
     ):
         if _seq > 0:
             await asyncio.sleep(0.1 * (2 ** _seq))
@@ -94,7 +94,7 @@ class SQSWriter:
                 MessageBody=self._encode(record),
                 DelaySeconds=delay_seconds,
                 MessageAttributes=attributes,
-                **message["params"],
+                **message["params"]
             )
         except Exception as e:
             logger.exception(e)
@@ -105,7 +105,7 @@ class SQSWriter:
                 group_id=group_id,
                 queued=False,
                 _seq=_seq + 1,
-                **attributes,
+                **attributes
             )
 
     async def write_batch(self, obj_list, _seq=0):
@@ -147,7 +147,7 @@ class SQSWriter:
         deduplication_id=None,
         group_id=None,
         queued: bool = True,
-        **attributes,
+        **attributes
     ):
         if func is None:
             return functools.partial(
@@ -156,7 +156,7 @@ class SQSWriter:
                 deduplication_id=deduplication_id,
                 group_id=group_id,
                 queued=queued,
-                **attributes,
+                **attributes
             )
         if type(func) == str:
 
@@ -168,7 +168,7 @@ class SQSWriter:
                     deduplication_id=deduplication_id,
                     group_id=group_id,
                     queued=queued,
-                    **attributes,
+                    **attributes
                 )
 
         else:
@@ -183,7 +183,7 @@ class SQSWriter:
                     deduplication_id=deduplication_id,
                     group_id=group_id,
                     queued=queued,
-                    **attributes,
+                    **attributes
                 )
 
         return async_func
