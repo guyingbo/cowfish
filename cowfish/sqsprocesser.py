@@ -8,6 +8,7 @@ import importlib
 import aiobotocore
 from . import utils
 from .worker import BatchWorker
+from . import __version__
 
 logger = logging.getLogger(__package__)
 __description__ = "An AWS SQS processer using asyncio/aiobotocore"
@@ -269,11 +270,18 @@ async def rpc_handler(message):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__description__)
+    epilog = "version info: cowfish/{} aiobotocore/{}".format(
+        __version__, aiobotocore.__version__
+    )
+    parser = argparse.ArgumentParser(description=__description__, epilog=epilog)
     parser.add_argument("queue_name")
     parser.add_argument("region")
-    parser.add_argument("-c", "--concurrency", type=int, default=20)
-    parser.add_argument("-v", "--visibility-timeout", type=int, default=60)
+    parser.add_argument(
+        "-c", "--concurrency", type=int, default=20, help="default to 20"
+    )
+    parser.add_argument(
+        "-v", "--visibility-timeout", type=int, default=60, help="default to 60"
+    )
     parser.add_argument("--handler", type=str, help="default to rpc_handler")
     parser.add_argument(
         "--no-batch",
