@@ -22,7 +22,7 @@ with open(os.path.join(BASE_PATH, "README.md")) as readme:
 
 setup(
     name="cowfish",
-    description="A useful asynchronous library bases on aiobotocore",
+    description="A useful asynchronous library that is built on top of aiobotocore",
     long_description=long_description,
     long_description_content_type="text/markdown",
     license="MIT",
@@ -37,10 +37,13 @@ setup(
     install_requires=["aiobotocore>=0.6.0"],
     entry_points={"console_scripts": ["sqsprocesser = cowfish.sqsprocesser:main"]},
     classifiers=[
+        "License :: OSI Approved :: MIT License",
+        "Framework :: AsyncIO",
+        "Intended Audience :: Developers",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
     ],
     setup_requires=["pytest-runner"],
-    tests_require=["pytest", "coverage", "pytest-cov"],
+    tests_require=["pytest", "coverage", "pytest-cov", "pytest-asyncio"],
 )
