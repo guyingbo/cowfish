@@ -1,0 +1,31 @@
+[tool.black]
+line-length = 88
+include = '\.pyi?$'
+
+[build-system]
+requires = ["flit"]
+build-backend = "flit.buildapi"
+
+[tool.flit.metadata]
+module = "cowfish"
+author = "Yingbo Gu"
+author-email = "tensiongyb@gmail.com"
+maintainer="Yingbo Gu"
+maintainer-email="tensiongyb@gmail.com"
+home-page = "https://github.com/guyingbo/cowfish"
+description-file = "README.md"
+requires-python=">=3.5"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+]
+requires = ["aiobotocore>=0.6.0"]
+dev-requires = ["pytest", "coverage", "pytest-cov", "pytest-asyncio"]
+keywords = "AWS aiobotocore cowfish kinesis SQS firehose asyncio"
+
+[tool.flit.entrypoints.console_scripts]
+sqsprocesser = "cowfish.sqsprocesser:main"
