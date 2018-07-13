@@ -5,6 +5,7 @@
 [![Version](https://img.shields.io/pypi/v/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
 [![Format](https://img.shields.io/pypi/format/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
 [![License](https://img.shields.io/pypi/l/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
+[![codecov](https://codecov.io/gh/guyingbo/cowfish/branch/master/graph/badge.svg)](https://codecov.io/gh/guyingbo/cowfish)
 
 A useful asynchronous library that is built on top of aiobotocore
 
