@@ -1,9 +1,14 @@
 language: python
 python:
-- 3.5
-- 3.6
-install: python setup.py install
-script: python setup.py test
+  - 3.5
+  - 3.6
+install:
+  - python setup.py install
+  - pip install codecov
+script:
+  - python setup.py test
+after_success:
+  - codecov
 deploy:
   provider: pypi
   user: guyingbo
