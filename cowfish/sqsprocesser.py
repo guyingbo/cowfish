@@ -107,6 +107,9 @@ class SQSProcesser:
             except Exception as e:
                 logger.exception(e)
                 continue
+        await self.close()
+
+    async def close(self):
         if self.futures:
             await asyncio.wait(self.futures)
         if self.change_worker:
@@ -229,6 +232,13 @@ class SQSProcesser:
         self.hooks["after_server_stop"].add(func)
 
     def start(self):
+        try:
+            self.loop.run_until_complete(self._get_queue_url())
+        except Exception:
+            self.loop.run_until_complete(self.close())
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.close()
+            raise
         try:
             self.loop.run_until_complete(self.run_forever())
         finally:
