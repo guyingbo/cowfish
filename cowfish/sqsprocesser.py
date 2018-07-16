@@ -1,3 +1,4 @@
+import sys
 import base64
 import pickle
 import signal
@@ -238,7 +239,11 @@ class SQSProcesser:
             self.loop.run_until_complete(self.close())
             self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             self.loop.close()
-            raise
+            print(
+                "The queue {} doesn't exists, exiting...".format(self.queue_name),
+                file=sys.stderr,
+            )
+            sys.exit(1)
         try:
             self.loop.run_until_complete(self.run_forever())
         finally:
