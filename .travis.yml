@@ -1,10 +1,15 @@
 language: python
+sudo: required
 python:
   - 3.5
   - 3.6
+before_install:
+  - sudo apt-get install libyaml-dev
 install:
   - python setup.py install
   - pip install codecov
+  - pip install localstack
+  - localstack start &
 script:
   - python setup.py test
 after_success:
