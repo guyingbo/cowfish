@@ -2,6 +2,7 @@ import sys
 import base64
 import pickle
 import signal
+import inspect
 import logging
 import asyncio
 import argparse
@@ -16,9 +17,14 @@ __description__ = "An AWS SQS processer using asyncio/aiobotocore"
 
 
 class SQSRetry(Exception):
-    def __init__(self, *, max_times: int, after: int):
+    def __init__(self, *, max_times: int, after: int = None):
         self.max_times = max_times
         self.seconds_later = after
+
+    def delay_seconds(self, retry_times):
+        if self.seconds_later is None:
+            return 1 + 2 ** retry_times
+        return self.seconds_later
 
 
 class Message(dict):
@@ -145,14 +151,17 @@ class SQSProcesser:
             delete = True
             try:
                 result = self.message_handler(message)
-                if asyncio.iscoroutine(result):
+                # if asyncio.iscoroutine(result):
+                if inspect.isawaitable(result):
                     await result
             except Exception as e:
                 if e.__class__.__name__ == SQSRetry.__name__:
-                    if e.max_times >= int(
+                    receive_count = int(
                         message.attributes.get("ApproximateReceiveCount", 1)
-                    ):
-                        await self.change_one(message, e.seconds_later)
+                    )
+                    if e.max_times > receive_count:
+                        seconds = e.delay_seconds(receive_count)
+                        await self.change_one(message, seconds)
                         delete = False
                 else:
                     logger.exception(e)
@@ -274,6 +283,8 @@ async def rpc_handler(message):
     func = import_function(record["fpath"])
     func = getattr(func, "_real", func)
     result = func(*record["args"], **record["kw"])
+    if inspect.isawaitable(result):
+        result = await result
     log = "{0}:{1}({2},{3})={4}".format(
         message.message_id,
         func.__name__,
