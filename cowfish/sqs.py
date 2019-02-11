@@ -21,7 +21,7 @@ class SQSWriter:
         encode_func: "function" = None,
         *,
         worker_params: dict = None,
-        client_params: dict = None
+        client_params: dict = None,
     ):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
@@ -68,7 +68,7 @@ class SQSWriter:
         group_id=None,
         queued: bool = False,
         _seq: int = 0,
-        **attributes
+        **attributes,
     ):
         if _seq > 0:
             await asyncio.sleep(0.1 * (2 ** _seq))
@@ -94,7 +94,7 @@ class SQSWriter:
                 MessageBody=self._encode(record),
                 DelaySeconds=delay_seconds,
                 MessageAttributes=attributes,
-                **message["params"]
+                **message["params"],
             )
         except Exception as e:
             logger.exception(e)
@@ -105,7 +105,7 @@ class SQSWriter:
                 group_id=group_id,
                 queued=False,
                 _seq=_seq + 1,
-                **attributes
+                **attributes,
             )
 
     async def write_batch(self, obj_list, _seq=0):
@@ -133,7 +133,11 @@ class SQSWriter:
             logger.exception(e)
             return obj_list
         if "Failed" in resp:
-            logger.error("Send failed: {}, {}".format(obj_list, resp["Failed"]))
+            logger.error(
+                "Send failed: {}, {}".format(
+                    len(obj_list), ", ".join(f"{k}={v!r}" for k, v in resp["Failed"])
+                )
+            )
             failed_obj_list = [
                 obj_list[int(d["Id"])] for d in resp["Failed"] if not d["SenderFault"]
             ]
@@ -147,7 +151,7 @@ class SQSWriter:
         deduplication_id=None,
         group_id=None,
         queued: bool = True,
-        **attributes
+        **attributes,
     ):
         if func is None:
             return functools.partial(
@@ -156,7 +160,7 @@ class SQSWriter:
                 deduplication_id=deduplication_id,
                 group_id=group_id,
                 queued=queued,
-                **attributes
+                **attributes,
             )
         if type(func) == str:
 
@@ -168,7 +172,7 @@ class SQSWriter:
                     deduplication_id=deduplication_id,
                     group_id=group_id,
                     queued=queued,
-                    **attributes
+                    **attributes,
                 )
 
         else:
@@ -183,7 +187,7 @@ class SQSWriter:
                     deduplication_id=deduplication_id,
                     group_id=group_id,
                     queued=queued,
-                    **attributes
+                    **attributes,
                 )
 
         return async_func
