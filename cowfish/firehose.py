@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 import aiobotocore
+from types import FunctionType
 from .worker import BatchWorker
 
 logger = logging.getLogger(__package__)
@@ -16,7 +17,7 @@ class Firehose:
         self,
         stream_name: str,
         region_name: str,
-        encode_func: "function" = None,
+        encode_func: FunctionType = None,
         delimiter: bytes = b"\n",
         *,
         worker_params: dict = None,
@@ -64,25 +65,24 @@ class Firehose:
             logger.exception(e)
             return obj_list
 
-    async def original_batch(self, obj_list: list, _seq: int = 0):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY:
-            raise Exception("write_batch error: firehose put_record_batch failed")
-        try:
-            resp = await self.client.put_record_batch(
-                DeliveryStreamName=self.stream_name,
-                Records=[
-                    {"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list
-                ],
-            )
-        except Exception as e:
-            logger.exception(e)
-            return obj_list
-        if resp["FailedPutCount"] > 0:
-            failed_obj_list = [
-                obj_list[i]
-                for i, record in enumerate(resp["RequestResponses"])
-                if "ErrorCode" in record
-            ]
-            return await self.write_batch(failed_obj_list, _seq=_seq + 1)
+    async def original_batch(self, obj_list: list):
+        records = [{"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list]
+        n = 0
+        while n < self.MAX_RETRY:
+            try:
+                resp = await self.client.put_record_batch(
+                    DeliveryStreamName=self.stream_name, Records=records
+                )
+            except Exception as e:
+                logger.exception(e)
+                return obj_list
+            if resp["FailedPutCount"] > 0:
+                records = [
+                    records[i]
+                    for i, record in enumerate(resp["RequestResponses"])
+                    if "ErrorCode" in record
+                ]
+                continue
+            n += 1
+            await asyncio.sleep(0.1 * (2 ** n))
+        raise Exception("write_batch error: firehose put_record_batch failed")

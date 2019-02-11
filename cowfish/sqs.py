@@ -5,6 +5,8 @@ import logging
 import asyncio
 import functools
 import aiobotocore
+from types import FunctionType
+from typing import Callable
 from .worker import BatchWorker
 
 logger = logging.getLogger(__package__)
@@ -18,7 +20,7 @@ class SQSWriter:
         self,
         queue_name: str,
         region_name: str,
-        encode_func: "function" = None,
+        encode_func: Callable = None,
         *,
         worker_params: dict = None,
         client_params: dict = None,
@@ -67,13 +69,8 @@ class SQSWriter:
         deduplication_id=None,
         group_id=None,
         queued: bool = False,
-        _seq: int = 0,
         **attributes,
     ):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY - 1:
-            raise Exception("write_one error: SQS send_message failed")
         message = {
             "record": record,
             "delay_seconds": delay_seconds,
@@ -88,33 +85,16 @@ class SQSWriter:
         if queued:
             await self.worker.put(message)
             return
-        try:
-            return await self.client.send_message(
-                QueueUrl=(await self._get_queue_url()),
-                MessageBody=self._encode(record),
-                DelaySeconds=delay_seconds,
-                MessageAttributes=attributes,
-                **message["params"],
-            )
-        except Exception as e:
-            logger.exception(e)
-            return await self.write_one(
-                record,
-                delay_seconds=delay_seconds,
-                deduplication_id=deduplication_id,
-                group_id=group_id,
-                queued=False,
-                _seq=_seq + 1,
-                **attributes,
-            )
+        QueueUrl = await self._get_queue_url()
+        return await self.client.send_message(
+            QueueUrl=QueueUrl,
+            MessageBody=self._encode(record),
+            DelaySeconds=delay_seconds,
+            MessageAttributes=attributes,
+            **message["params"],
+        )
 
-    async def write_batch(self, obj_list, _seq=0):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY - 1:
-            raise Exception(
-                "write_batch error: SQS send_message_batch failed", obj_list
-            )
+    async def write_batch(self, obj_list):
         Entries = [
             {
                 "Id": str(i),
@@ -125,27 +105,29 @@ class SQSWriter:
             }
             for i, message in enumerate(obj_list)
         ]
-        try:
-            resp = await self.client.send_message_batch(
-                QueueUrl=(await self._get_queue_url()), Entries=Entries
-            )
-        except Exception as e:
-            logger.exception(e)
-            return obj_list
-        if "Failed" in resp:
-            logger.error(
-                "Send failed: {}, {}".format(
-                    len(obj_list), ", ".join(f"{k}={v!r}" for k, v in resp["Failed"])
+        QueueUrl = await self._get_queue_url()
+        n = 0
+        while n < self.MAX_RETRY:
+            try:
+                resp = await self.client.send_message_batch(
+                    QueueUrl=QueueUrl, Entries=Entries
                 )
-            )
-            failed_obj_list = [
-                obj_list[int(d["Id"])] for d in resp["Failed"] if not d["SenderFault"]
-            ]
-            return await self.write_batch(failed_obj_list, _seq=_seq + 1)
+            except Exception as e:
+                logger.exception(e)
+                return obj_list
+            if "Failed" not in resp:
+                return
+            failed_detail = ", ".join(f"{k}={v!r}" for k, v in resp["Failed"])
+            logger.error("Send failed: {}, {}".format(len(Entries), failed_detail))
+            obj_id_list = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
+            Entries = [entry for entry in Entries if entry["Id"] in obj_id_list]
+            n += 1
+            await asyncio.sleep(0.1 * (2 ** n))
+        raise Exception("write_batch error: SQS send_message_batch failed")
 
     def async_rpc(
         self,
-        func: "function" = None,
+        func: FunctionType = None,
         *,
         delay_seconds: int = 0,
         deduplication_id=None,

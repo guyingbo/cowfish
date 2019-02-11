@@ -2,12 +2,14 @@ import sys
 import base64
 import pickle
 import signal
+from typing import Callable, Union, Coroutine
 import inspect
 import logging
 import asyncio
 import argparse
 import importlib
 import aiobotocore
+from types import FunctionType
 from . import utils
 from .worker import BatchWorker
 from . import __version__
@@ -52,7 +54,7 @@ class SQSProcesser:
         self,
         queue_name: str,
         region_name: str,
-        message_handler: "callable or coroutine",
+        message_handler: Union[Callable, Coroutine],
         *,
         concurrency: int = 10,
         visibility_timeout: int = 60,
@@ -171,30 +173,33 @@ class SQSProcesser:
         finally:
             self.semaphore.release()
 
-    async def change_batch(self, messages, _seq: int = 0):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY:
-            raise Exception("change_message_visibility_batch failed", messages)
-        try:
-            resp = await self.client.change_message_visibility_batch(
-                QueueUrl=(await self._get_queue_url()),
-                Entries=[
-                    {
-                        "Id": str(index),
-                        "ReceiptHandle": message["ReceiptHandle"],
-                        "VisibilityTimeout": timeout,
-                    }
-                    for index, (message, timeout) in enumerate(messages)
-                ],
-            )
-        except Exception as e:
-            logger.exception(e)
-            return messages
-        if "Failed" in resp:
-            logger.error("Change failed: {} {}".format(messages, resp["Failed"]))
-            server_failed_messages = [messages[int(d["Id"])] for d in resp["Failed"]]
-            return await self.change_batch(server_failed_messages, _seq + 1)
+    async def change_batch(self, messages):
+        entries = [
+            {
+                "Id": str(index),
+                "ReceiptHandle": message["ReceiptHandle"],
+                "VisibilityTimeout": timeout,
+            }
+            for index, (message, timeout) in enumerate(messages)
+        ]
+        queue_url = await self._get_queue_url()
+        n = 0
+        while n < self.MAX_RETRY:
+            try:
+                resp = await self.client.change_message_visibility_batch(
+                    QueueUrl=queue_url, Entries=entries
+                )
+            except Exception as e:
+                logger.exception(e)
+                return messages
+            if "Failed" not in resp:
+                return
+            logger.error("Change failed: {} {}".format(len(entries), resp["Failed"]))
+            failed_ids = set(d["Id"] for d in resp["Failed"])
+            entries = [entry for entry in entries if entry["Id"] in failed_ids]
+            n += 1
+            await asyncio.sleep(0.1 * (2 ** n))
+        raise Exception("change_message_visibility_batch failed")
 
     async def change_one(self, message, visibility_timeout: int):
         if self.change_worker:
@@ -206,28 +211,29 @@ class SQSProcesser:
             VisibilityTimeout=visibility_timeout,
         )
 
-    async def delete_batch(self, messages, _seq: int = 0):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY:
-            raise Exception("delete_message_batch failed", messages)
-        try:
-            resp = await self.client.delete_message_batch(
-                QueueUrl=(await self._get_queue_url()),
-                Entries=[
-                    {"Id": str(index), "ReceiptHandle": message["ReceiptHandle"]}
-                    for index, message in enumerate(messages)
-                ],
-            )
-        except Exception as e:
-            logger.exception(e)
-            return messages
-        if "Failed" in resp:
-            logger.error("Delete failed: {}, {}".format(messages, resp["Failed"]))
-            server_failed_messages = [
-                messages[int(d["Id"])] for d in resp["Failed"] if not d["SenderFault"]
-            ]
-            return await self.delete_batch(server_failed_messages, _seq + 1)
+    async def delete_batch(self, messages):
+        entries = [
+            {"Id": str(index), "ReceiptHandle": message["ReceiptHandle"]}
+            for index, message in enumerate(messages)
+        ]
+        queue_url = await self._get_queue_url()
+        n = 0
+        while n < self.MAX_RETRY:
+            try:
+                resp = await self.client.delete_message_batch(
+                    QueueUrl=queue_url, Entries=entries
+                )
+            except Exception as e:
+                logger.exception(e)
+                return messages
+            if "Failed" not in resp:
+                return
+            logger.error("Delete failed: {}, {}".format(len(entries), resp["Failed"]))
+            failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
+            entries = [entry for entry in entries if entry["Id"] in failed_ids]
+            n += 1
+            await asyncio.sleep(0.1 * (2 ** n))
+        raise Exception("delete_message_batch failed", messages)
 
     async def delete_one(self, message):
         if self.delete_worker:
@@ -238,7 +244,7 @@ class SQSProcesser:
             ReceiptHandle=message["ReceiptHandle"],
         )
 
-    def after_server_stop(self, func: "function"):
+    def after_server_stop(self, func: FunctionType):
         self.hooks["after_server_stop"].add(func)
 
     def start(self):
@@ -268,7 +274,7 @@ class SQSProcesser:
             self.loop.close()
 
 
-def import_function(path: str) -> "function":
+def import_function(path: str) -> FunctionType:
     module_path, func_name = path.rsplit(".", 1)
     module = importlib.import_module(module_path)
     return getattr(module, func_name)

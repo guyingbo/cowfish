@@ -5,6 +5,7 @@ import base64
 import asyncio
 import logging
 import aiobotocore
+from types import FunctionType
 from .worker import BatchWorker
 
 try:
@@ -22,8 +23,8 @@ class Kinesis:
         self,
         stream_name: str,
         region_name: str,
-        encode_func: "function" = None,
-        key_func: "function" = None,
+        encode_func: FunctionType = None,
+        key_func: FunctionType = None,
         *,
         worker_params: dict = None,
         client_params: dict = None
@@ -58,47 +59,40 @@ class Kinesis:
     def _encode(self, obj):
         return self.encode_func(obj)
 
-    async def write_batch(self, obj_list: list, _seq: int = 0):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY:
-            raise Exception("write_batch error: kinesis put_records failed", obj_list)
-        try:
-            resp = await self.client.put_records(
-                StreamName=self.stream_name,
-                Records=[
-                    {"PartitionKey": self._get_key(obj), "Data": self._encode(obj)}
-                    for obj in obj_list
-                ],
-            )
-        except Exception as e:
-            logger.exception(e)
-            return obj_list
-        if resp["FailedRecordCount"] > 0:
-            failed_obj_list = [
-                obj_list[i]
+    async def write_batch(self, obj_list: list):
+        records = [
+            {"PartitionKey": self._get_key(obj), "Data": self._encode(obj)}
+            for obj in obj_list
+        ]
+        n = 0
+        while n < self.MAX_RETRY:
+            try:
+                resp = await self.client.put_records(
+                    StreamName=self.stream_name, Records=records
+                )
+            except Exception as e:
+                logger.exception(e)
+                return obj_list
+            if resp["FailedRecordCount"] == 0:
+                return
+            records = [
+                records[i]
                 for i, record in enumerate(resp["Records"])
                 if "ErrorCode" in record
             ]
-            return await self.write_batch(failed_obj_list, _seq=_seq + 1)
+            n += 1
+            await asyncio.sleep(0.1 * (2 ** n))
+        raise Exception("write_batch error: kinesis put_records failed")
 
-    async def write_one(self, obj, queued: bool = False, _seq: int = 0):
-        if _seq > 0:
-            await asyncio.sleep(0.1 * (2 ** _seq))
-        if _seq > self.MAX_RETRY - 1:
-            raise Exception("write_one error: kinesis put_record failed")
+    async def write_one(self, obj, queued: bool = False):
         if queued:
             await self.worker.put(obj)
             return
-        try:
-            return await self.client.put_record(
-                StreamName=self.stream_name,
-                Data=self._encode(obj),
-                PartitionKey=self._get_key(obj),
-            )
-        except Exception as e:
-            logger.exception(e)
-            return await self.write_one(obj, queued=False, _seq=_seq + 1)
+        return await self.client.put_record(
+            StreamName=self.stream_name,
+            Data=self._encode(obj),
+            PartitionKey=self._get_key(obj),
+        )
 
 
 class CompactKinesis(Kinesis):

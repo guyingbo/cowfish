@@ -45,5 +45,14 @@ setup(
         "Programming Language :: Python :: 3.7",
     ],
     setup_requires=["pytest-runner"],
-    tests_require=["pytest", "coverage", "pytest-cov", "pytest-asyncio"],
+    tests_require=[
+        "pytest",
+        "coverage",
+        "pytest-cov",
+        "pytest-asyncio",
+        "moto",
+        "aiohttp",
+        "requests",
+        "msgpack",
+    ],
 )
