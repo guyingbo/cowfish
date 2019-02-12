@@ -43,7 +43,7 @@ class Firehose:
     async def put(self, obj):
         return await self.worker.put(obj)
 
-    async def stop(self):
+    async def stop(self) -> None:
         timestamp = time.time()
         await self.worker.stop()
         await self.client.close()

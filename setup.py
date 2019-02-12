@@ -33,14 +33,13 @@ setup(
     maintainer_email="tensiongyb@gmail.com",
     url="https://github.com/guyingbo/cowfish",
     packages=["cowfish"],
-    python_requires=">=3.5",
+    python_requires=">=3.6",
     install_requires=["aiobotocore>=0.6.0"],
     entry_points={"console_scripts": ["sqsprocesser = cowfish.sqsprocesser:main"]},
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Framework :: AsyncIO",
         "Intended Audience :: Developers",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
     ],
@@ -54,5 +53,6 @@ setup(
         "aiohttp",
         "requests",
         "msgpack",
+        "boto3",
     ],
 )

@@ -2,7 +2,7 @@ import sys
 import base64
 import pickle
 import signal
-from typing import Callable, Union, Coroutine
+from typing import Callable, Union, Coroutine, Optional
 import inspect
 import logging
 import asyncio
@@ -60,9 +60,9 @@ class SQSProcesser:
         visibility_timeout: int = 60,
         idle_sleep: int = 0,
         batch_ops: bool = True,
-        client_params: dict = None,
-        delete_worker_params: dict = None,
-        change_worker_params: dict = None,
+        client_params: Optional[dict] = None,
+        delete_worker_params: Optional[dict] = None,
+        change_worker_params: Optional[dict] = None,
         loop=None
     ):
         self.queue_name = queue_name
@@ -109,7 +109,7 @@ class SQSProcesser:
                     self.QueueUrl = resp["QueueUrl"]
         return self.QueueUrl
 
-    async def run_forever(self):
+    async def run_forever(self) -> None:
         while not self.quit_event.is_set():
             try:
                 await self._fetch_messages()
@@ -118,7 +118,7 @@ class SQSProcesser:
                 continue
         await self.close()
 
-    async def close(self):
+    async def close(self) -> None:
         if self.futures:
             await asyncio.wait(self.futures)
         if self.change_worker:
@@ -127,7 +127,7 @@ class SQSProcesser:
             await self.delete_worker.stop()
         await self.client.close()
 
-    async def _fetch_messages(self):
+    async def _fetch_messages(self) -> None:
         job = self.client.receive_message(
             QueueUrl=(await self._get_queue_url()),
             AttributeNames=["ApproximateReceiveCount"],
@@ -148,7 +148,7 @@ class SQSProcesser:
                 self.futures.add(fut)
                 fut.add_done_callback(self.futures.remove)
 
-    async def handle(self, message):
+    async def handle(self, message) -> None:
         try:
             delete = True
             try:
@@ -173,7 +173,7 @@ class SQSProcesser:
         finally:
             self.semaphore.release()
 
-    async def change_batch(self, messages):
+    async def change_batch(self, messages: list):
         entries = [
             {
                 "Id": str(index),
@@ -211,7 +211,7 @@ class SQSProcesser:
             VisibilityTimeout=visibility_timeout,
         )
 
-    async def delete_batch(self, messages):
+    async def delete_batch(self, messages: list):
         entries = [
             {"Id": str(index), "ReceiptHandle": message["ReceiptHandle"]}
             for index, message in enumerate(messages)
@@ -244,7 +244,7 @@ class SQSProcesser:
             ReceiptHandle=message["ReceiptHandle"],
         )
 
-    def after_server_stop(self, func: FunctionType):
+    def after_server_stop(self, func: FunctionType) -> None:
         self.hooks["after_server_stop"].add(func)
 
     def start(self):
@@ -280,11 +280,11 @@ def import_function(path: str) -> FunctionType:
     return getattr(module, func_name)
 
 
-async def plain_handler(message):
+async def plain_handler(message) -> None:
     print(message)
 
 
-async def rpc_handler(message):
+async def rpc_handler(message) -> None:
     record = message.body
     func = import_function(record["fpath"])
     func = getattr(func, "_real", func)

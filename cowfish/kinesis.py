@@ -44,7 +44,7 @@ class Kinesis:
             self.__class__.__name__, self.stream_name, self.worker
         )
 
-    async def stop(self):
+    async def stop(self) -> None:
         timestamp = time.time()
         await self.worker.stop()
         await self.client.close()
@@ -56,7 +56,7 @@ class Kinesis:
             return base64.b64encode(os.urandom(24)).decode("ascii")
         return self.key_func(obj)
 
-    def _encode(self, obj):
+    def _encode(self, obj) -> bytes:
         return self.encode_func(obj)
 
     async def write_batch(self, obj_list: list):
@@ -105,10 +105,10 @@ class CompactKinesis(Kinesis):
             raise ImportError("need msgpack")
         self.bufmax = 1024 * 25
 
-    def _encode(self, obj):
+    def _encode(self, obj) -> bytes:
         return obj
 
-    async def write(self, obj, flush: bool = False):
+    async def write(self, obj, flush: bool = False) -> None:
         packed = self.packer.pack(obj)
         if len(self.buffer) + len(packed) >= self.bufmax:
             payload = bytes(self.buffer)
@@ -122,18 +122,18 @@ class CompactKinesis(Kinesis):
                 self.buffer.clear()
                 await self.write_one(payload, queued=True)
 
-    async def flush(self):
+    async def flush(self) -> None:
         if self.buffer:
             payload = bytes(self.buffer)
             self.buffer.clear()
             await self.write_one(payload, queued=True)
 
-    async def write_fluent(self, label: str, data: str):
+    async def write_fluent(self, label: str, data: str) -> None:
         timestamp = int(time.time())
         packet = (label, timestamp, data)
         await self.write(packet)
 
-    async def stop(self):
+    async def stop(self) -> None:
         if self.buffer:
             payload = bytes(self.buffer)
             self.buffer.clear()

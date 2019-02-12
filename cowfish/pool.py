@@ -1,9 +1,10 @@
 import asyncio
 import collections
+from typing import Callable
 
 
 class Pool:
-    def __init__(self, factory: "function", minsize: int = 1, maxsize: int = 10):
+    def __init__(self, factory: Callable, minsize: int = 1, maxsize: int = 10):
         self.factory = factory
         self.minsize = minsize
         self.maxsize = maxsize
@@ -25,13 +26,13 @@ class Pool:
     def freesize(self) -> int:
         return len(self._pool)
 
-    async def clear(self):
+    async def clear(self) -> None:
         async with self._cond:
             while self._pool:
                 client = self._pool.popleft()
                 await client.close()
 
-    async def _do_close(self):
+    async def _do_close(self) -> None:
         async with self._cond:
             assert self._acquiring == 0, self._acquiring
             while self._pool:
@@ -41,13 +42,13 @@ class Pool:
                 await client.close()
             self._using.clear()
 
-    async def close(self):
+    async def close(self) -> None:
         if not self._close_state.is_set():
             self._close_state.set()
             await self._do_close()
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         return self._close_state.is_set()
 
     async def acquire(self):
@@ -62,17 +63,17 @@ class Pool:
                 else:
                     await self._cond.wait()
 
-    async def release(self, client):
+    async def release(self, client) -> None:
         assert client in self._using
         self._using.remove(client)
         self._pool.append(client)
         await self._wakeup()
 
-    async def _wakeup(self):
+    async def _wakeup(self) -> None:
         async with self._cond:
             self._cond.notify()
 
-    def _fill_free(self, *, override_min: bool):
+    def _fill_free(self, *, override_min: bool) -> None:
         while self.size < self.minsize:
             self._acquiring += 1
             try:

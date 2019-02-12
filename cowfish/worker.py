@@ -44,13 +44,13 @@ class BatchWorker:
     def qsize(self) -> int:
         return self.queue.qsize()
 
-    async def put(self, obj):
+    async def put(self, obj) -> None:
         await self.queue.put(obj)
 
-    def start(self):
+    def start(self) -> None:
         self.fut = asyncio.ensure_future(self.run())
 
-    async def stop(self):
+    async def stop(self) -> None:
         logger.info("Stopping {0!r}".format(self))
         await self.queue.put(self.quit)
         if self.fut:
@@ -73,7 +73,7 @@ class BatchWorker:
             timeout -= time.time() - timestamp
         return obj_list
 
-    async def run(self):
+    async def run(self) -> None:
         logger.info("Starting {0!r}".format(self))
         while not self.shutdown:
             obj_list = await self._get_obj_list()
@@ -86,7 +86,7 @@ class BatchWorker:
         if self.futures:
             await asyncio.wait(self.futures)
 
-    async def handle(self, obj_list: list):
+    async def handle(self, obj_list: list) -> None:
         try:
             try:
                 result = self.handler(obj_list)

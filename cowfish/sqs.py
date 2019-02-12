@@ -6,7 +6,7 @@ import asyncio
 import functools
 import aiobotocore
 from types import FunctionType
-from typing import Callable
+from typing import Callable, Optional, Any
 from .worker import BatchWorker
 
 logger = logging.getLogger(__package__)
@@ -19,11 +19,11 @@ class SQSWriter:
     def __init__(
         self,
         queue_name: str,
-        region_name: str,
-        encode_func: Callable = None,
+        region_name: Optional[str] = None,
+        encode_func: Optional[Callable] = None,
         *,
-        worker_params: dict = None,
-        client_params: dict = None,
+        worker_params: Optional[dict] = None,
+        client_params: Optional[dict] = None,
     ):
         self.session = aiobotocore.get_session()
         self.queue_name = queue_name
@@ -44,7 +44,7 @@ class SQSWriter:
             self.__class__.__name__, self.queue_name, self.worker
         )
 
-    async def _get_queue_url(self):
+    async def _get_queue_url(self) -> str:
         if self.QueueUrl is None:
             async with self.lock:
                 if self.QueueUrl is None:
@@ -52,22 +52,22 @@ class SQSWriter:
                     self.QueueUrl = resp["QueueUrl"]
         return self.QueueUrl
 
-    async def stop(self):
+    async def stop(self) -> None:
         timestamp = time.time()
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
         logger.info("{0!r} stopped in {1:.1f} seconds".format(self, cost))
 
-    def _encode(self, obj):
+    def _encode(self, obj: Any) -> str:
         return self.encode_func(obj)
 
     async def write_one(
         self,
-        record,
+        record: Any,
         delay_seconds: int = 0,
-        deduplication_id=None,
-        group_id=None,
+        deduplication_id: Optional[str] = None,
+        group_id: Optional[str] = None,
         queued: bool = False,
         **attributes,
     ):
@@ -94,7 +94,7 @@ class SQSWriter:
             **message["params"],
         )
 
-    async def write_batch(self, obj_list):
+    async def write_batch(self, obj_list: list):
         Entries = [
             {
                 "Id": str(i),
@@ -130,11 +130,11 @@ class SQSWriter:
         func: FunctionType = None,
         *,
         delay_seconds: int = 0,
-        deduplication_id=None,
-        group_id=None,
+        deduplication_id: Optional[str] = None,
+        group_id: Optional[str] = None,
         queued: bool = True,
         **attributes,
-    ):
+    ) -> FunctionType:
         if func is None:
             return functools.partial(
                 self.async_rpc,
@@ -176,18 +176,18 @@ class SQSWriter:
 
 
 class StringAttribute(dict):
-    def __init__(self, value):
+    def __init__(self, value: str):
         self["DataType"] = "String"
         self["StringValue"] = str(value)
 
 
 class BinaryAttribute(dict):
-    def __init__(self, value):
+    def __init__(self, value: bytes):
         self["DataType"] = "Binary"
         self["BinaryValue"] = bytes(value)
 
 
 class NumberAttribute(dict):
-    def __init__(self, value):
+    def __init__(self, value: str):
         self["DataType"] = "Number"
         self["StringValue"] = str(value)
