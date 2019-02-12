@@ -9,8 +9,8 @@ before_install:
 install:
   - python setup.py install
   - python -m pip install codecov
-  - pyhton -m pip install moto
-  - pyhton -m pip install botocore==1.12.91
+  - python -m pip install botocore==1.12.91
+  - python -m pip install moto
   - python -m pip install aiobotocore
 script:
   - python setup.py test
