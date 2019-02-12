@@ -9,6 +9,7 @@ before_install:
 install:
   - python setup.py install
   - pip install codecov
+  - pip install botocore==1.12.91
 script:
   - python setup.py test
 after_success:
