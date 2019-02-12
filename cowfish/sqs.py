@@ -118,6 +118,8 @@ class SQSWriter:
             except Exception as e:
                 logger.exception(e)
                 n += 1
+                if n >= self.MAX_RETRY:
+                    raise
                 continue
             if "Failed" not in resp:
                 return

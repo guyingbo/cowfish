@@ -220,19 +220,6 @@ def sqs_server():
 
 
 @pytest.yield_fixture(scope="session")
-def firehose_server():
-    host = "localhost"
-    port = 4573
-    url = "http://{host}:{port}".format(host=host, port=port)
-    process = start_service("firehose", host, port)
-
-    try:
-        yield url
-    finally:
-        stop_process(process)
-
-
-@pytest.yield_fixture(scope="session")
 def kinesis_server():
     host = "localhost"
     port = 4568

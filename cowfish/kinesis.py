@@ -5,7 +5,7 @@ import base64
 import asyncio
 import logging
 import aiobotocore
-from types import FunctionType
+from typing import Callable, Optional
 from .worker import BatchWorker
 
 try:
@@ -23,12 +23,12 @@ class Kinesis:
     def __init__(
         self,
         stream_name: str,
-        region_name: str,
-        encode_func: FunctionType = None,
-        key_func: FunctionType = None,
+        region_name: Optional[str] = None,
+        encode_func: Optional[Callable] = None,
+        key_func: Optional[Callable] = None,
         *,
-        worker_params: dict = None,
-        client_params: dict = None
+        worker_params: Optional[dict] = None,
+        client_params: Optional[dict] = None
     ):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
@@ -76,6 +76,8 @@ class Kinesis:
             except Exception as e:
                 logger.exception(e)
                 n += 1
+                if n >= self.MAX_RETRY:
+                    raise
                 continue
             if resp["FailedRecordCount"] == 0:
                 return

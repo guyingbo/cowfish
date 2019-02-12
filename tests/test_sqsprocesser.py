@@ -15,6 +15,6 @@ client_params = {
 def t_processer(sqs_server):
     # session = aiobotocore.get_session()
     # client = session.create_client("sqs", region_name="us-east-1", **client_params)
-    processer = SQSProcesser("fake", "us-east-1", plain_handler)
+    processer = SQSProcesser("fake", plain_handler)
     loop.call_later(2, processer.quit_event.set)
     processer.start()

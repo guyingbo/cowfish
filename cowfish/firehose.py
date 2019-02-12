@@ -3,7 +3,7 @@ import json
 import logging
 import asyncio
 import aiobotocore
-from types import FunctionType
+from typing import Callable, Optional
 from .worker import BatchWorker
 
 logger = logging.getLogger(__package__)
@@ -17,12 +17,12 @@ class Firehose:
     def __init__(
         self,
         stream_name: str,
-        region_name: str,
-        encode_func: FunctionType = None,
+        region_name: Optional[str] = None,
+        encode_func: Optional[Callable] = None,
         delimiter: bytes = b"\n",
         *,
-        worker_params: dict = None,
-        client_params: dict = None,
+        worker_params: Optional[dict] = None,
+        client_params: Optional[dict] = None,
         original_api: bool = False
     ):
         self.session = aiobotocore.get_session()
@@ -56,17 +56,25 @@ class Firehose:
         encoded.append(b"")
         return self.delimiter.join(encoded)
 
-    async def write_batch(self, obj_list: list):
-        try:
-            data = self._encode(obj_list)
-            await self.client.put_record(
-                DeliveryStreamName=self.stream_name, Record={"Data": data}
-            )
-        except Exception as e:
-            logger.exception(e)
-            return obj_list
+    async def write_batch(self, obj_list: list) -> None:
+        record = {"Data": self._encode(obj_list)}
+        n = 0
+        while n < self.MAX_RETRY:
+            if n > 0:
+                await asyncio.sleep(self.sleep_base * (2 ** n))
+            try:
+                await self.client.put_record(
+                    DeliveryStreamName=self.stream_name, Record=record
+                )
+            except Exception as e:
+                logger.exception(e)
+                n += 1
+                if n >= self.MAX_RETRY:
+                    raise
+                continue
+            return
 
-    async def original_batch(self, obj_list: list):
+    async def original_batch(self, obj_list: list) -> None:
         records = [{"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list]
         n = 0
         while n < self.MAX_RETRY:
@@ -79,6 +87,8 @@ class Firehose:
             except Exception as e:
                 logger.exception(e)
                 n += 1
+                if n >= self.MAX_RETRY:
+                    raise
                 continue
             if resp["FailedPutCount"] > 0:
                 records = [

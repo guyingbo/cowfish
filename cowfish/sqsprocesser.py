@@ -2,7 +2,6 @@ import sys
 import base64
 import pickle
 import signal
-from typing import Callable, Union, Coroutine, Optional
 import inspect
 import logging
 import asyncio
@@ -10,6 +9,7 @@ import argparse
 import importlib
 import aiobotocore
 from types import FunctionType
+from typing import Callable, Union, Coroutine, Optional
 from . import utils
 from .worker import BatchWorker
 from . import __version__
@@ -54,9 +54,9 @@ class SQSProcesser:
     def __init__(
         self,
         queue_name: str,
-        region_name: str,
         message_handler: Union[Callable, Coroutine],
         *,
+        region_name: Optional[str] = None,
         concurrency: int = 10,
         visibility_timeout: int = 60,
         idle_sleep: int = 0,
@@ -64,7 +64,7 @@ class SQSProcesser:
         client_params: Optional[dict] = None,
         delete_worker_params: Optional[dict] = None,
         change_worker_params: Optional[dict] = None,
-        loop=None
+        loop=None,
     ):
         self.queue_name = queue_name
         self.concurrency = concurrency
@@ -195,6 +195,8 @@ class SQSProcesser:
             except Exception as e:
                 logger.exception(e)
                 n += 1
+                if n >= self.MAX_RETRY:
+                    raise
                 continue
             if "Failed" not in resp:
                 return
@@ -231,6 +233,8 @@ class SQSProcesser:
             except Exception as e:
                 logger.exception(e)
                 n += 1
+                if n >= self.MAX_RETRY:
+                    raise
                 continue
             if "Failed" not in resp:
                 return
