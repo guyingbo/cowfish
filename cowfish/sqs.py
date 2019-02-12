@@ -15,6 +15,7 @@ logger = logging.getLogger(__package__)
 class SQSWriter:
     service_name = "sqs"
     MAX_RETRY = 10
+    sleep_base = 0.3
 
     def __init__(
         self,
@@ -109,7 +110,7 @@ class SQSWriter:
         n = 0
         while n < self.MAX_RETRY:
             if n > 0:
-                await asyncio.sleep(0.3 * (2 ** n))
+                await asyncio.sleep(self.sleep_base * (2 ** n))
             try:
                 resp = await self.client.send_message_batch(
                     QueueUrl=queue_url, Entries=Entries

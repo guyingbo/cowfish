@@ -210,8 +210,11 @@ def sqs_server():
     url = "http://{host}:{port}".format(host=host, port=port)
     process = start_service("sqs", host, port)
 
+    def stop():
+        stop_process(process)
+
     try:
-        yield url
+        yield url, stop
     finally:
         stop_process(process)
 

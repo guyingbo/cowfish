@@ -18,6 +18,7 @@ logger = logging.getLogger(__package__)
 class Kinesis:
     service_name = "kinesis"
     MAX_RETRY = 10
+    sleep_base = 0.3
 
     def __init__(
         self,
@@ -67,7 +68,7 @@ class Kinesis:
         n = 0
         while n < self.MAX_RETRY:
             if n > 0:
-                await asyncio.sleep(0.3 * (2 ** n))
+                await asyncio.sleep(self.sleep_base * (2 ** n))
             try:
                 resp = await self.client.put_records(
                     StreamName=self.stream_name, Records=records

@@ -49,6 +49,7 @@ class Message(dict):
 class SQSProcesser:
     service_name = "sqs"
     MAX_RETRY = 10
+    sleep_base = 0.3
 
     def __init__(
         self,
@@ -186,7 +187,7 @@ class SQSProcesser:
         n = 0
         while n < self.MAX_RETRY:
             if n > 0:
-                await asyncio.sleep(0.3 * (2 ** n))
+                await asyncio.sleep(self.sleep_base * (2 ** n))
             try:
                 resp = await self.client.change_message_visibility_batch(
                     QueueUrl=queue_url, Entries=entries
@@ -222,7 +223,7 @@ class SQSProcesser:
         n = 0
         while n < self.MAX_RETRY:
             if n > 0:
-                await asyncio.sleep(0.3 * (2 ** n))
+                await asyncio.sleep(self.sleep_base * (2 ** n))
             try:
                 resp = await self.client.delete_message_batch(
                     QueueUrl=queue_url, Entries=entries

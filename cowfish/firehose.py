@@ -12,6 +12,7 @@ logger = logging.getLogger(__package__)
 class Firehose:
     service_name = "firehose"
     MAX_RETRY = 10
+    sleep_base = 0.3
 
     def __init__(
         self,
@@ -70,7 +71,7 @@ class Firehose:
         n = 0
         while n < self.MAX_RETRY:
             if n > 0:
-                await asyncio.sleep(0.3 * (2 ** n))
+                await asyncio.sleep(self.sleep_base * (2 ** n))
             try:
                 resp = await self.client.put_record_batch(
                     DeliveryStreamName=self.stream_name, Records=records

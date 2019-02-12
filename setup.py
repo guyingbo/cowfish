@@ -34,7 +34,7 @@ setup(
     url="https://github.com/guyingbo/cowfish",
     packages=["cowfish"],
     python_requires=">=3.6",
-    install_requires=["aiobotocore"],
+    install_requires=["aiobotocore", "botocore"],
     entry_points={"console_scripts": ["sqsprocesser = cowfish.sqsprocesser:main"]},
     classifiers=[
         "License :: OSI Approved :: MIT License",
@@ -45,12 +45,11 @@ setup(
     ],
     setup_requires=["pytest-runner"],
     tests_require=[
-        "botocore==1.12.91",
+        "moto",
         "pytest",
         "coverage",
         "pytest-cov",
         "pytest-asyncio",
-        "moto",
         "aiohttp",
         "requests",
         "msgpack",
