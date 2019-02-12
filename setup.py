@@ -34,7 +34,7 @@ setup(
     url="https://github.com/guyingbo/cowfish",
     packages=["cowfish"],
     python_requires=">=3.6",
-    install_requires=["aiobotocore>=0.6.0"],
+    install_requires=["aiobotocore"],
     entry_points={"console_scripts": ["sqsprocesser = cowfish.sqsprocesser:main"]},
     classifiers=[
         "License :: OSI Approved :: MIT License",
@@ -53,6 +53,5 @@ setup(
         "aiohttp",
         "requests",
         "msgpack",
-        "boto",
     ],
 )
