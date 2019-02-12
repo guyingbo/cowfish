@@ -203,7 +203,7 @@ def sns_server():
         stop_process(process)
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.yield_fixture(scope="function")
 def sqs_server():
     host = "localhost"
     port = 4576
