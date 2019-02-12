@@ -12,6 +12,7 @@ install:
   - python -m pip install botocore==1.12.91
   - python -m pip install moto
   - python -m pip install aiobotocore
+  - sudo rm -f /etc/boto.cfg
 script:
   - python setup.py test
 after_success:
