@@ -6,7 +6,7 @@ import asyncio
 import functools
 import aiobotocore
 from types import FunctionType
-from typing import Callable, Optional, Any
+from typing import Callable, Optional, Any, Union
 from .worker import BatchWorker
 
 logger = logging.getLogger(__package__)
@@ -129,7 +129,7 @@ class SQSWriter:
 
     def async_rpc(
         self,
-        func: FunctionType = None,
+        func: Union[FunctionType, str, None] = None,
         *,
         delay_seconds: int = 0,
         deduplication_id: Optional[str] = None,
