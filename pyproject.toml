@@ -22,7 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
 ]
-requires = ["aiobotocore>=0.6.0"]
+requires = ["aiobotocore"]
 dev-requires = ["pytest", "coverage", "pytest-cov", "pytest-asyncio"]
 keywords = "AWS aiobotocore cowfish kinesis SQS firehose asyncio"
 

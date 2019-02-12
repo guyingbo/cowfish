@@ -45,6 +45,7 @@ setup(
     ],
     setup_requires=["pytest-runner"],
     tests_require=[
+        "botocore==1.12.91",
         "pytest",
         "coverage",
         "pytest-cov",
