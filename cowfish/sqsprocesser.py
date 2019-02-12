@@ -173,7 +173,7 @@ class SQSProcesser:
         finally:
             self.semaphore.release()
 
-    async def change_batch(self, messages: list):
+    async def change_batch(self, messages: list) -> None:
         entries = [
             {
                 "Id": str(index),
@@ -185,20 +185,22 @@ class SQSProcesser:
         queue_url = await self._get_queue_url()
         n = 0
         while n < self.MAX_RETRY:
+            if n > 0:
+                await asyncio.sleep(0.3 * (2 ** n))
             try:
                 resp = await self.client.change_message_visibility_batch(
                     QueueUrl=queue_url, Entries=entries
                 )
             except Exception as e:
                 logger.exception(e)
-                return messages
+                n += 1
+                continue
             if "Failed" not in resp:
                 return
-            logger.error("Change failed: {} {}".format(len(entries), resp["Failed"]))
             failed_ids = set(d["Id"] for d in resp["Failed"])
+            logger.error(f"Change failed {n}: {failed_ids} {resp['Failed']}")
             entries = [entry for entry in entries if entry["Id"] in failed_ids]
             n += 1
-            await asyncio.sleep(0.1 * (2 ** n))
         raise Exception("change_message_visibility_batch failed")
 
     async def change_one(self, message, visibility_timeout: int):
@@ -211,7 +213,7 @@ class SQSProcesser:
             VisibilityTimeout=visibility_timeout,
         )
 
-    async def delete_batch(self, messages: list):
+    async def delete_batch(self, messages: list) -> None:
         entries = [
             {"Id": str(index), "ReceiptHandle": message["ReceiptHandle"]}
             for index, message in enumerate(messages)
@@ -219,20 +221,22 @@ class SQSProcesser:
         queue_url = await self._get_queue_url()
         n = 0
         while n < self.MAX_RETRY:
+            if n > 0:
+                await asyncio.sleep(0.3 * (2 ** n))
             try:
                 resp = await self.client.delete_message_batch(
                     QueueUrl=queue_url, Entries=entries
                 )
             except Exception as e:
                 logger.exception(e)
-                return messages
+                n += 1
+                continue
             if "Failed" not in resp:
                 return
-            logger.error("Delete failed: {}, {}".format(len(entries), resp["Failed"]))
             failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
+            logger.error(f"Delete failed {n}: {failed_ids}, {resp['Failed']}")
             entries = [entry for entry in entries if entry["Id"] in failed_ids]
             n += 1
-            await asyncio.sleep(0.1 * (2 ** n))
         raise Exception("delete_message_batch failed", messages)
 
     async def delete_one(self, message):

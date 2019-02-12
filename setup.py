@@ -53,6 +53,6 @@ setup(
         "aiohttp",
         "requests",
         "msgpack",
-        "boto3",
+        "boto",
     ],
 )

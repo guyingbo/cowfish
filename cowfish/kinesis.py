@@ -59,20 +59,23 @@ class Kinesis:
     def _encode(self, obj) -> bytes:
         return self.encode_func(obj)
 
-    async def write_batch(self, obj_list: list):
+    async def write_batch(self, obj_list: list) -> None:
         records = [
             {"PartitionKey": self._get_key(obj), "Data": self._encode(obj)}
             for obj in obj_list
         ]
         n = 0
         while n < self.MAX_RETRY:
+            if n > 0:
+                await asyncio.sleep(0.3 * (2 ** n))
             try:
                 resp = await self.client.put_records(
                     StreamName=self.stream_name, Records=records
                 )
             except Exception as e:
                 logger.exception(e)
-                return obj_list
+                n += 1
+                continue
             if resp["FailedRecordCount"] == 0:
                 return
             records = [
@@ -81,7 +84,6 @@ class Kinesis:
                 if "ErrorCode" in record
             ]
             n += 1
-            await asyncio.sleep(0.1 * (2 ** n))
         raise Exception("write_batch error: kinesis put_records failed")
 
     async def write_one(self, obj, queued: bool = False):

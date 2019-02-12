@@ -40,7 +40,7 @@ class Firehose:
             self.__class__.__name__, self.stream_name, self.worker
         )
 
-    async def put(self, obj):
+    async def put(self, obj) -> None:
         return await self.worker.put(obj)
 
     async def stop(self) -> None:
@@ -69,20 +69,23 @@ class Firehose:
         records = [{"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list]
         n = 0
         while n < self.MAX_RETRY:
+            if n > 0:
+                await asyncio.sleep(0.3 * (2 ** n))
             try:
                 resp = await self.client.put_record_batch(
                     DeliveryStreamName=self.stream_name, Records=records
                 )
             except Exception as e:
                 logger.exception(e)
-                return obj_list
+                n += 1
+                continue
             if resp["FailedPutCount"] > 0:
                 records = [
                     records[i]
                     for i, record in enumerate(resp["RequestResponses"])
                     if "ErrorCode" in record
                 ]
+                n += 1
                 continue
-            n += 1
-            await asyncio.sleep(0.1 * (2 ** n))
+            return
         raise Exception("write_batch error: firehose put_record_batch failed")

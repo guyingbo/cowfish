@@ -91,10 +91,7 @@ class BatchWorker:
             try:
                 result = self.handler(obj_list)
                 if asyncio.iscoroutine(result):
-                    result = await result
-                if result:
-                    for obj in result:
-                        await self.queue.put(obj)
+                    await result
             except Exception as e:
                 logger.exception(e)
         finally:

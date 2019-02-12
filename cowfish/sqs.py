@@ -85,16 +85,16 @@ class SQSWriter:
         if queued:
             await self.worker.put(message)
             return
-        QueueUrl = await self._get_queue_url()
+        queue_url = await self._get_queue_url()
         return await self.client.send_message(
-            QueueUrl=QueueUrl,
+            QueueUrl=queue_url,
             MessageBody=self._encode(record),
             DelaySeconds=delay_seconds,
             MessageAttributes=attributes,
             **message["params"],
         )
 
-    async def write_batch(self, obj_list: list):
+    async def write_batch(self, obj_list: list) -> None:
         Entries = [
             {
                 "Id": str(i),
@@ -105,24 +105,25 @@ class SQSWriter:
             }
             for i, message in enumerate(obj_list)
         ]
-        QueueUrl = await self._get_queue_url()
+        queue_url = await self._get_queue_url()
         n = 0
         while n < self.MAX_RETRY:
+            if n > 0:
+                await asyncio.sleep(0.3 * (2 ** n))
             try:
                 resp = await self.client.send_message_batch(
-                    QueueUrl=QueueUrl, Entries=Entries
+                    QueueUrl=queue_url, Entries=Entries
                 )
             except Exception as e:
                 logger.exception(e)
-                return obj_list
+                n += 1
+                continue
             if "Failed" not in resp:
                 return
-            failed_detail = ", ".join(f"{k}={v!r}" for k, v in resp["Failed"])
-            logger.error("Send failed: {}, {}".format(len(Entries), failed_detail))
-            obj_id_list = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
-            Entries = [entry for entry in Entries if entry["Id"] in obj_id_list]
+            failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
+            logger.error(f"Send failed {n}: {failed_ids}, {resp['Failed']}")
+            Entries = [entry for entry in Entries if entry["Id"] in failed_ids]
             n += 1
-            await asyncio.sleep(0.1 * (2 ** n))
         raise Exception("write_batch error: SQS send_message_batch failed")
 
     def async_rpc(
