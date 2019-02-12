@@ -8,8 +8,8 @@ before_install:
   - sudo apt-get install libyaml-dev
 install:
   - python setup.py install
-  - pip install codecov
-  - pip install botocore==1.12.91
+  - python -m pip install codecov
+  - python -m pip install aiobotocore
 script:
   - python setup.py test
 after_success:
