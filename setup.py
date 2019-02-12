@@ -52,5 +52,6 @@ setup(
         "aiohttp",
         "requests",
         "msgpack",
+        "flask",
     ],
 )
