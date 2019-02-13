@@ -12,9 +12,9 @@ def test_processer(sqs_server):
     }
     loop = asyncio.get_event_loop()
     queue_name = "test-sqsprocesser"
-    processer = SQSProcesser(queue_name, plain_handler, client_params=client_params)
-    loop.run_until_complete(
-        processer.client.create_queue(QueueName=queue_name)
+    processer = SQSProcesser(
+        queue_name, plain_handler, region_name="us-east-1", client_params=client_params
     )
+    loop.run_until_complete(processer.client.create_queue(QueueName=queue_name))
     loop.call_later(2, processer.quit_event.set)
     processer.start()

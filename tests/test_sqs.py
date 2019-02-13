@@ -12,7 +12,9 @@ async def test_sqs(sqs_server):
         "aws_access_key_id": "xxx",
         "aws_secret_access_key": "xxx",
     }
-    writer = SQSWriter("fake.fifo", "us-east-1", client_params=client_params)
+    writer = SQSWriter(
+        "fake.fifo", region_name="us-east-1", client_params=client_params
+    )
     writer.sleep_base = 0.001
     try:
         await writer.client.create_queue(QueueName="fake.fifo")
@@ -56,7 +58,7 @@ async def test_sqs2(sqs_server):
         "aws_access_key_id": "xxx",
         "aws_secret_access_key": "xxx",
     }
-    writer = SQSWriter("fake", "us-east-1", client_params=client_params)
+    writer = SQSWriter("fake", region_name="us-east-1", client_params=client_params)
     writer.sleep_base = 0.001
     try:
         await writer.client.create_queue(QueueName="fake")

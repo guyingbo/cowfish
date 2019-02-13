@@ -12,7 +12,7 @@ async def test_kinesis(kinesis_server):
         "aws_access_key_id": "xxx",
         "aws_secret_access_key": "xxx",
     }
-    kinesis = Kinesis("fake", client_params=client_params)
+    kinesis = Kinesis("fake", region_name="us-east-1", client_params=client_params)
     await kinesis.client.create_stream(StreamName="fake", ShardCount=2)
     await kinesis.write_one({"test": 1})
     await kinesis.write_one({"test": 2}, queued=True)
@@ -26,7 +26,9 @@ async def test_compact_kinesis(kinesis_server):
         "aws_access_key_id": "xxx",
         "aws_secret_access_key": "xxx",
     }
-    kinesis = CompactKinesis("fake", client_params=client_params)
+    kinesis = CompactKinesis(
+        "fake", region_name="us-east-1", client_params=client_params
+    )
     await kinesis.write({"test": 1})
     await kinesis.flush()
     await kinesis.stop()
