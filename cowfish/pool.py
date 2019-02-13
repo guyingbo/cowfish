@@ -16,7 +16,7 @@ class Pool:
         self._fill_free(override_min=False)
 
     def __repr__(self):
-        return "<{}: size={}>".format(self.__class__.__name__, self.size)
+        return f"<{self.__class__.__name__}: size={self.size}>"
 
     @property
     def size(self) -> int:

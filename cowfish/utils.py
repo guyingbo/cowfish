@@ -15,7 +15,7 @@ async def cancel_on_event(coro, event: asyncio.Event):
 
 
 def format_params(params: dict) -> str:
-    return ", ".join("{}={}".format(k, v) for k, v in params.items())
+    return ", ".join(f"{k}={v}" for k, v in params.items())
 
 
 class ClientMethodProxy:

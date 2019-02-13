@@ -41,8 +41,9 @@ class SQSWriter:
         self.worker = BatchWorker(self.write_batch, **worker_params)
 
     def __repr__(self):
-        return "<{}: queue={}, worker={!r}>".format(
-            self.__class__.__name__, self.queue_name, self.worker
+        return (
+            f"<{self.__class__.__name__}: "
+            f"queue={self.queue_name}, worker={self.worker!r}>"
         )
 
     async def _get_queue_url(self) -> str:
@@ -58,7 +59,7 @@ class SQSWriter:
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
-        logger.info("{0!r} stopped in {1:.1f} seconds".format(self, cost))
+        logger.info(f"{self!r} stopped in {cost:.1f} seconds")
 
     def _encode(self, obj: Any) -> str:
         return self.encode_func(obj)

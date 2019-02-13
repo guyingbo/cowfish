@@ -28,7 +28,7 @@ class Kinesis:
         key_func: Optional[Callable] = None,
         *,
         worker_params: Optional[dict] = None,
-        client_params: Optional[dict] = None
+        client_params: Optional[dict] = None,
     ):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
@@ -41,8 +41,9 @@ class Kinesis:
         self.worker = BatchWorker(self.write_batch, **worker_params)
 
     def __repr__(self):
-        return "<{}: stream={}, worker={!r}>".format(
-            self.__class__.__name__, self.stream_name, self.worker
+        return (
+            f"<{self.__class__.__name__}: "
+            f"stream={self.stream_name}, worker={self.worker!r}>"
         )
 
     async def stop(self) -> None:
@@ -50,7 +51,7 @@ class Kinesis:
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
-        logger.info("{0!r} stopped in {1:.1f} seconds".format(self, cost))
+        logger.info(f"{self!r} stopped in {cost:.1f} seconds")
 
     def _get_key(self, obj) -> bytes:
         if self.key_func is None:

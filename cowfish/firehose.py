@@ -23,7 +23,7 @@ class Firehose:
         *,
         worker_params: Optional[dict] = None,
         client_params: Optional[dict] = None,
-        original_api: bool = False
+        original_api: bool = False,
     ):
         self.session = aiobotocore.get_session()
         self.stream_name = stream_name
@@ -37,8 +37,9 @@ class Firehose:
         self.worker = BatchWorker(batch_func, **worker_params)
 
     def __repr__(self):
-        return "<{}: stream={}, worker={!r}>".format(
-            self.__class__.__name__, self.stream_name, self.worker
+        return (
+            f"<{self.__class__.__name__}: "
+            f"stream={self.stream_name}, worker={self.worker!r}>"
         )
 
     async def put(self, obj) -> None:
@@ -49,7 +50,7 @@ class Firehose:
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
-        logger.info("{0!r} stopped in {1:.1f} seconds".format(self, cost))
+        logger.info(f"{self!r} stopped in {cost:.1f} seconds")
 
     def _encode(self, obj_list: list) -> bytes:
         encoded = [self.encode_func(obj) for obj in obj_list]

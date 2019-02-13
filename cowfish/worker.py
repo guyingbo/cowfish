@@ -51,7 +51,7 @@ class BatchWorker:
         self.fut = asyncio.ensure_future(self.run())
 
     async def stop(self) -> None:
-        logger.info("Stopping {0!r}".format(self))
+        logger.info(f"Stopping {self!r}")
         await self.queue.put(self.quit)
         if self.fut:
             await self.fut
@@ -74,7 +74,7 @@ class BatchWorker:
         return obj_list
 
     async def run(self) -> None:
-        logger.info("Starting {0!r}".format(self))
+        logger.info(f"Starting {self!r}")
         while not self.shutdown:
             obj_list = await self._get_obj_list()
             if not obj_list:

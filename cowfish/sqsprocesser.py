@@ -263,7 +263,7 @@ class SQSProcesser:
             loop.run_until_complete(loop.shutdown_asyncgens())
             loop.close()
             print(
-                "The queue {} doesn't exists, exiting...".format(self.queue_name),
+                f"The queue {self.queue_name} doesn't exists, exiting...",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -302,16 +302,16 @@ async def rpc_handler(message) -> None:
     log = "{0}:{1}({2},{3})={4}".format(
         message.message_id,
         func.__name__,
-        ", ".join(["{0!r}".format(arg) for arg in record["args"]]),
-        ", ".join(["{0}={1}".format(k, v) for k, v in record["kw"].items()]),
+        ", ".join([f"{arg!r}" for arg in record["args"]]),
+        ", ".join([f"{k}={v}" for k, v in record["kw"].items()]),
         result,
     )
     logger.info(log)
 
 
 def main():
-    epilog = "version info: cowfish/{} aiobotocore/{}".format(
-        __version__, aiobotocore.__version__
+    epilog = (
+        f"version info: cowfish/{__version__} aiobotocore/{aiobotocore.__version__}"
     )
     parser = argparse.ArgumentParser(description=__description__, epilog=epilog)
     parser.add_argument("queue_name")
