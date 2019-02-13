@@ -29,13 +29,17 @@ async def test_sqs(sqs_server):
     for i in range(30):
         await writer.write_one({"test": 2}, queued=True)
     await asyncio.sleep(0.1)
+
     @writer.async_rpc
     async def foo(a, b):
         return a + b
+
     await foo(3, 4)
+
     @writer.async_rpc()
     async def bar():
         return 10
+
     await bar()
     await writer.async_rpc("foo")(3, 4)
     stop()

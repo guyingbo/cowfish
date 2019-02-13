@@ -64,7 +64,6 @@ class SQSProcesser:
         client_params: Optional[dict] = None,
         delete_worker_params: Optional[dict] = None,
         change_worker_params: Optional[dict] = None,
-        loop=None,
     ):
         self.queue_name = queue_name
         self.concurrency = concurrency
@@ -77,10 +76,7 @@ class SQSProcesser:
         client_params["region_name"] = region_name
         self.lock = asyncio.Lock()
         self.session = aiobotocore.get_session()
-        self.loop = loop or asyncio.get_event_loop()
         self.quit_event = asyncio.Event()
-        self.loop.add_signal_handler(signal.SIGINT, self.quit_event.set)
-        self.loop.add_signal_handler(signal.SIGTERM, self.quit_event.set)
         self.semaphore = asyncio.Semaphore(concurrency)
         self.futures = set()
         self.client = self.session.create_client(self.service_name, **client_params)
@@ -256,31 +252,34 @@ class SQSProcesser:
     def after_server_stop(self, func: FunctionType) -> None:
         self.hooks["after_server_stop"].add(func)
 
-    def start(self):
+    def start(self, loop=None):
+        loop = loop or asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGINT, self.quit_event.set)
+        loop.add_signal_handler(signal.SIGTERM, self.quit_event.set)
         try:
-            self.loop.run_until_complete(self._get_queue_url())
+            loop.run_until_complete(self._get_queue_url())
         except Exception:
-            self.loop.run_until_complete(self.close())
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            self.loop.close()
+            loop.run_until_complete(self.close())
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
             print(
                 "The queue {} doesn't exists, exiting...".format(self.queue_name),
                 file=sys.stderr,
             )
             sys.exit(1)
         try:
-            self.loop.run_until_complete(self.run_forever())
+            loop.run_until_complete(self.run_forever())
         finally:
             try:
                 for func in self.hooks["after_server_stop"]:
                     if asyncio.iscoroutinefunction(func):
-                        self.loop.run_until_complete(func(self.loop))
+                        loop.run_until_complete(func(loop))
                     else:
-                        func(self.loop)
+                        func(loop)
             except Exception as e:
                 logger.exception(e)
-            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            self.loop.close()
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
 
 
 def import_function(path: str) -> FunctionType:
