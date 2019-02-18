@@ -74,6 +74,8 @@ class Firehose:
                     raise
                 continue
             return
+        else:
+            raise Exception("write_batch error: firehose put_record failed")
 
     async def original_batch(self, obj_list: list) -> None:
         records = [{"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list]
@@ -100,4 +102,5 @@ class Firehose:
                 n += 1
                 continue
             return
-        raise Exception("write_batch error: firehose put_record_batch failed")
+        else:
+            raise Exception("write_batch error: firehose put_record_batch failed")

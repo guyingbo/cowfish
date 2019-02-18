@@ -200,7 +200,8 @@ class SQSProcesser:
             logger.error(f"Change failed {n}: {failed_ids} {resp['Failed']}")
             entries = [entry for entry in entries if entry["Id"] in failed_ids]
             n += 1
-        raise Exception("change_message_visibility_batch failed")
+        else:
+            raise Exception("change_message_visibility_batch failed")
 
     async def change_one(self, message, visibility_timeout: int):
         if self.change_worker:
@@ -238,7 +239,8 @@ class SQSProcesser:
             logger.error(f"Delete failed {n}: {failed_ids}, {resp['Failed']}")
             entries = [entry for entry in entries if entry["Id"] in failed_ids]
             n += 1
-        raise Exception("delete_message_batch failed", messages)
+        else:
+            raise Exception("delete_message_batch failed", messages)
 
     async def delete_one(self, message):
         if self.delete_worker:

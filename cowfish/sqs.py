@@ -128,7 +128,8 @@ class SQSWriter:
             logger.error(f"Send failed {n}: {failed_ids}, {resp['Failed']}")
             Entries = [entry for entry in Entries if entry["Id"] in failed_ids]
             n += 1
-        raise Exception("write_batch error: SQS send_message_batch failed")
+        else:
+            raise Exception("write_batch error: SQS send_message_batch failed")
 
     def async_rpc(
         self,
