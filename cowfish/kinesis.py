@@ -32,6 +32,7 @@ class Kinesis:
         client_params["region_name"] = region_name
         self.client = self.session.create_client(self.service_name, **client_params)
         worker_params = worker_params or {}
+        worker_params.setdefault("name", "KinesisWorker")
         self.worker = BatchWorker(self.write_batch, **worker_params)
 
     def __repr__(self):

@@ -31,6 +31,7 @@ class Firehose:
         client_params["region_name"] = region_name
         self.client = self.session.create_client(self.service_name, **client_params)
         worker_params = worker_params or {}
+        worker_params.setdefault("name", "FirehoseWorker")
         batch_func = self.original_batch if original_api else self.write_batch
         self.worker = BatchWorker(batch_func, **worker_params)
 

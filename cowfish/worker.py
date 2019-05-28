@@ -16,13 +16,15 @@ class BatchWorker:
         maxsize: int = 0,
         aggr_num: int = 10,
         timeout: int = 5,
-        concurrency: int = 10
+        concurrency: int = 10,
+        name: str = "BatchWorker"
     ):
         self.queue = asyncio.Queue(maxsize)
         self.handler = handler
         self.aggr_num = aggr_num
         self.timeout = timeout
         self.concurrency = concurrency
+        self.name = name
         self.semaphore = asyncio.Semaphore(concurrency)
         self.quit = object()
         self.shutdown = False
@@ -32,7 +34,7 @@ class BatchWorker:
 
     def __repr__(self):
         return "<{}: qsize={}, concurrency={}, working={}>".format(
-            self.__class__.__name__,
+            self.name,
             self.queue.qsize(),
             self.concurrency,
             len(self.futures),

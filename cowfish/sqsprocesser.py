@@ -80,8 +80,10 @@ class SQSProcesser:
         self.client = self.session.create_client(self.service_name, **client_params)
         if batch_ops:
             delete_worker_params = delete_worker_params or {}
+            delete_worker_params.setdefault("name", "SQSDeleteWorker")
             self.delete_worker = BatchWorker(self.delete_batch, **delete_worker_params)
             change_worker_params = change_worker_params or {}
+            change_worker_params.setdefault("name", "SQSChangeWorker")
             self.change_worker = BatchWorker(self.change_batch, **change_worker_params)
         else:
             self.delete_worker = None

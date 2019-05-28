@@ -36,6 +36,7 @@ class SQSWriter:
         self.QueueUrl = None
         self.lock = asyncio.Lock()
         worker_params = worker_params or {}
+        worker_params.setdefault("name", "SQSWorker")
         self.worker = BatchWorker(self.write_batch, **worker_params)
 
     def __repr__(self):
