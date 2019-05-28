@@ -1,15 +1,13 @@
 import time
 import base64
 import pickle
-import logging
 import asyncio
 import functools
 import aiobotocore
 from types import FunctionType
 from typing import Callable, Optional, Any, Union
 from .worker import BatchWorker
-
-logger = logging.getLogger(__package__)
+from . import utils
 
 
 class SQSWriter:
@@ -59,7 +57,7 @@ class SQSWriter:
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
-        logger.info(f"{self!r} stopped in {cost:.1f} seconds")
+        await utils.info(f"{self!r} stopped in {cost:.1f} seconds")
 
     def _encode(self, obj: Any) -> str:
         return self.encode_func(obj)
@@ -117,7 +115,7 @@ class SQSWriter:
                     QueueUrl=queue_url, Entries=Entries
                 )
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
                 n += 1
                 if n >= self.MAX_RETRY:
                     raise
@@ -125,7 +123,7 @@ class SQSWriter:
             if "Failed" not in resp:
                 return
             failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
-            logger.error(f"Send failed {n}: {failed_ids}, {resp['Failed']}")
+            await utils.info(f"Send failed {n}: {failed_ids}, {resp['Failed']}")
             Entries = [entry for entry in Entries if entry["Id"] in failed_ids]
             n += 1
         else:

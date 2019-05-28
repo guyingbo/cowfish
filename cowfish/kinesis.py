@@ -3,16 +3,10 @@ import time
 import json
 import base64
 import asyncio
-import logging
 import aiobotocore
 from typing import Callable, Optional
 from .worker import BatchWorker
-
-try:
-    import msgpack
-except ImportError:
-    pass
-logger = logging.getLogger(__package__)
+from . import utils
 
 
 class Kinesis:
@@ -51,7 +45,7 @@ class Kinesis:
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
-        logger.info(f"{self!r} stopped in {cost:.1f} seconds")
+        await utils.info(f"{self!r} stopped in {cost:.1f} seconds")
 
     def _get_key(self, obj) -> bytes:
         if self.key_func is None:
@@ -75,7 +69,7 @@ class Kinesis:
                     StreamName=self.stream_name, Records=records
                 )
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
                 n += 1
                 if n >= self.MAX_RETRY:
                     raise
@@ -103,12 +97,11 @@ class Kinesis:
 
 class CompactKinesis(Kinesis):
     def __init__(self, *args, **kw):
+        import msgpack
+
         super().__init__(*args, **kw)
         self.buffer = bytearray()
-        try:
-            self.packer = msgpack.Packer()
-        except NameError:
-            raise ImportError("need msgpack")
+        self.packer = msgpack.Packer()
         self.bufmax = 1024 * 25
 
     def _encode(self, obj) -> bytes:

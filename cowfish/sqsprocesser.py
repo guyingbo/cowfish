@@ -3,7 +3,6 @@ import base64
 import pickle
 import signal
 import inspect
-import logging
 import asyncio
 import argparse
 import importlib
@@ -14,7 +13,6 @@ from . import utils
 from .worker import BatchWorker
 from . import __version__
 
-logger = logging.getLogger(__package__)
 __description__ = "An AWS SQS processer using asyncio/aiobotocore"
 
 
@@ -63,7 +61,7 @@ class SQSProcesser:
         batch_ops: bool = True,
         client_params: Optional[dict] = None,
         delete_worker_params: Optional[dict] = None,
-        change_worker_params: Optional[dict] = None,
+        change_worker_params: Optional[dict] = None
     ):
         self.queue_name = queue_name
         self.concurrency = concurrency
@@ -111,7 +109,10 @@ class SQSProcesser:
             try:
                 await self._fetch_messages()
             except Exception as e:
-                logger.exception(e)
+                try:
+                    await utils.handle_exc(e)
+                except Exception:
+                    pass
                 continue
         await self.close()
 
@@ -163,7 +164,7 @@ class SQSProcesser:
                         await self.change_one(message, seconds)
                         delete = False
                 else:
-                    logger.exception(e)
+                    await utils.handle_exc(e)
             finally:
                 if delete:
                     await self.delete_one(message)
@@ -189,7 +190,7 @@ class SQSProcesser:
                     QueueUrl=queue_url, Entries=entries
                 )
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
                 n += 1
                 if n >= self.MAX_RETRY:
                     raise
@@ -197,7 +198,7 @@ class SQSProcesser:
             if "Failed" not in resp:
                 return
             failed_ids = set(d["Id"] for d in resp["Failed"])
-            logger.error(f"Change failed {n}: {failed_ids} {resp['Failed']}")
+            await utils.info(f"Change failed {n}: {failed_ids} {resp['Failed']}")
             entries = [entry for entry in entries if entry["Id"] in failed_ids]
             n += 1
         else:
@@ -228,7 +229,7 @@ class SQSProcesser:
                     QueueUrl=queue_url, Entries=entries
                 )
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
                 n += 1
                 if n >= self.MAX_RETRY:
                     raise
@@ -236,7 +237,7 @@ class SQSProcesser:
             if "Failed" not in resp:
                 return
             failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
-            logger.error(f"Delete failed {n}: {failed_ids}, {resp['Failed']}")
+            await utils.info(f"Delete failed {n}: {failed_ids}, {resp['Failed']}")
             entries = [entry for entry in entries if entry["Id"] in failed_ids]
             n += 1
         else:
@@ -279,7 +280,7 @@ class SQSProcesser:
                     else:
                         func(loop)
             except Exception as e:
-                logger.exception(e)
+                loop.run_until_complete(utils.handle_exc(e))
             loop.run_until_complete(loop.shutdown_asyncgens())
             loop.close()
 
@@ -308,7 +309,7 @@ async def rpc_handler(message) -> None:
         ", ".join([f"{k}={v}" for k, v in record["kw"].items()]),
         result,
     )
-    logger.info(log)
+    await utils.info(log)
 
 
 def main():

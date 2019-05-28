@@ -1,4 +1,6 @@
+import logging
 import asyncio
+logger = logging.getLogger(__package__)
 
 
 async def cancel_on_event(coro, event: asyncio.Event):
@@ -32,3 +34,11 @@ class ClientMethodProxy:
                 await self._pool.release(client)
             finally:
                 self._pool = None
+
+
+async def handle_exc(e):
+    logger.exception(str(e))
+
+
+async def info(s):
+    logger.info(s)

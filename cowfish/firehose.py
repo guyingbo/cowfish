@@ -1,12 +1,10 @@
 import time
 import json
-import logging
 import asyncio
 import aiobotocore
 from typing import Callable, Optional
 from .worker import BatchWorker
-
-logger = logging.getLogger(__package__)
+from . import utils
 
 
 class Firehose:
@@ -50,7 +48,7 @@ class Firehose:
         await self.worker.stop()
         await self.client.close()
         cost = time.time() - timestamp
-        logger.info(f"{self!r} stopped in {cost:.1f} seconds")
+        await utils.info(f"{self!r} stopped in {cost:.1f} seconds")
 
     def _encode(self, obj_list: list) -> bytes:
         encoded = [self.encode_func(obj) for obj in obj_list]
@@ -68,14 +66,12 @@ class Firehose:
                     DeliveryStreamName=self.stream_name, Record=record
                 )
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
                 n += 1
                 if n >= self.MAX_RETRY:
                     raise
                 continue
             return
-        else:
-            raise Exception("write_batch error: firehose put_record failed")
 
     async def original_batch(self, obj_list: list) -> None:
         records = [{"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list]
@@ -88,7 +84,7 @@ class Firehose:
                     DeliveryStreamName=self.stream_name, Records=records
                 )
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
                 n += 1
                 if n >= self.MAX_RETRY:
                     raise

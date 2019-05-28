@@ -1,9 +1,7 @@
 import time
-import logging
 import asyncio
 import async_timeout
-
-logger = logging.getLogger(__package__)
+from . import utils
 
 
 class BatchWorker:
@@ -51,7 +49,7 @@ class BatchWorker:
         self.fut = asyncio.ensure_future(self.run())
 
     async def stop(self) -> None:
-        logger.info(f"Stopping {self!r}")
+        await utils.info(f"Stopping {self!r}")
         await self.queue.put(self.quit)
         if self.fut:
             await self.fut
@@ -74,7 +72,7 @@ class BatchWorker:
         return obj_list
 
     async def run(self) -> None:
-        logger.info(f"Starting {self!r}")
+        await utils.info(f"Starting {self!r}")
         while not self.shutdown:
             obj_list = await self._get_obj_list()
             if not obj_list:
@@ -93,6 +91,6 @@ class BatchWorker:
                 if asyncio.iscoroutine(result):
                     await result
             except Exception as e:
-                logger.exception(e)
+                await utils.handle_exc(e)
         finally:
             self.semaphore.release()
