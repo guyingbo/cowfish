@@ -21,6 +21,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
 ]
 requires = ["aiobotocore"]
 dev-requires = ["pytest", "coverage", "pytest-cov", "pytest-asyncio"]

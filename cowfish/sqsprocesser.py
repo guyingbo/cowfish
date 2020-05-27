@@ -61,7 +61,7 @@ class SQSProcesser:
         batch_ops: bool = True,
         client_params: Optional[dict] = None,
         delete_worker_params: Optional[dict] = None,
-        change_worker_params: Optional[dict] = None
+        change_worker_params: Optional[dict] = None,
     ):
         self.queue_name = queue_name
         self.concurrency = concurrency
@@ -70,14 +70,13 @@ class SQSProcesser:
         self.idle_sleep = idle_sleep
         self.QueueUrl = None
         self.hooks = {"after_server_stop": set()}
-        client_params = client_params or {}
-        client_params["region_name"] = region_name
+        self.client_params = client_params or {}
+        self.client_params["region_name"] = region_name
         self.lock = asyncio.Lock()
         self.session = aiobotocore.get_session()
         self.quit_event = asyncio.Event()
         self.semaphore = asyncio.Semaphore(concurrency)
         self.futures = set()
-        self.client = self.session.create_client(self.service_name, **client_params)
         if batch_ops:
             delete_worker_params = delete_worker_params or {}
             delete_worker_params.setdefault("name", "SQSDeleteWorker")
@@ -90,19 +89,22 @@ class SQSProcesser:
             self.change_worker = None
 
     def __repr__(self):
-        return "<{}: queue={}, client={}, concurrency={}, working={}>".format(
+        return "<{}: queue={}, concurrency={}, working={}>".format(
             self.__class__.__name__,
             self.queue_name,
-            self.client,
             self.concurrency,
             len(self.futures),
         )
+
+    def create_client(self):
+        return self.session.create_client(self.service_name, **self.client_params)
 
     async def _get_queue_url(self) -> str:
         if self.QueueUrl is None:
             async with self.lock:
                 if self.QueueUrl is None:
-                    resp = await self.client.get_queue_url(QueueName=self.queue_name)
+                    async with self.create_client() as client:
+                        resp = await client.get_queue_url(QueueName=self.queue_name)
                     self.QueueUrl = resp["QueueUrl"]
         return self.QueueUrl
 
@@ -125,28 +127,28 @@ class SQSProcesser:
             await self.change_worker.stop()
         if self.delete_worker:
             await self.delete_worker.stop()
-        await self.client.close()
 
     async def _fetch_messages(self) -> None:
-        job = self.client.receive_message(
-            QueueUrl=(await self._get_queue_url()),
-            AttributeNames=["ApproximateReceiveCount"],
-            MessageAttributeNames=["All"],
-            MaxNumberOfMessages=10,
-            VisibilityTimeout=self.visibility_timeout,
-            WaitTimeSeconds=20,
-        )
-        response = await utils.cancel_on_event(job, self.quit_event)
-        if self.quit_event.is_set():
-            return
-        if "Messages" not in response and self.idle_sleep > 0:
-            await asyncio.sleep(self.idle_sleep)
-        if "Messages" in response:
-            for message_dict in response["Messages"]:
-                await self.semaphore.acquire()
-                fut = asyncio.ensure_future(self.handle(Message(message_dict)))
-                self.futures.add(fut)
-                fut.add_done_callback(self.futures.remove)
+        async with self.create_client() as client:
+            job = client.receive_message(
+                QueueUrl=(await self._get_queue_url()),
+                AttributeNames=["ApproximateReceiveCount"],
+                MessageAttributeNames=["All"],
+                MaxNumberOfMessages=10,
+                VisibilityTimeout=self.visibility_timeout,
+                WaitTimeSeconds=20,
+            )
+            response = await utils.cancel_on_event(job, self.quit_event)
+            if self.quit_event.is_set():
+                return
+            if "Messages" not in response and self.idle_sleep > 0:
+                await asyncio.sleep(self.idle_sleep)
+            if "Messages" in response:
+                for message_dict in response["Messages"]:
+                    await self.semaphore.acquire()
+                    fut = asyncio.ensure_future(self.handle(Message(message_dict)))
+                    self.futures.add(fut)
+                    fut.add_done_callback(self.futures.remove)
 
     async def handle(self, message) -> None:
         try:
@@ -184,37 +186,39 @@ class SQSProcesser:
         ]
         queue_url = await self._get_queue_url()
         n = 0
-        while n < self.MAX_RETRY:
-            if n > 0:
-                await asyncio.sleep(self.sleep_base * (2 ** n))
-            try:
-                resp = await self.client.change_message_visibility_batch(
-                    QueueUrl=queue_url, Entries=entries
-                )
-            except Exception as e:
-                await utils.handle_exc(e)
+        async with self.create_client() as client:
+            while n < self.MAX_RETRY:
+                if n > 0:
+                    await asyncio.sleep(self.sleep_base * (2 ** n))
+                try:
+                    resp = await client.change_message_visibility_batch(
+                        QueueUrl=queue_url, Entries=entries
+                    )
+                except Exception as e:
+                    await utils.handle_exc(e)
+                    n += 1
+                    if n >= self.MAX_RETRY:
+                        raise
+                    continue
+                if "Failed" not in resp:
+                    return
+                failed_ids = set(d["Id"] for d in resp["Failed"])
+                await utils.info(f"Change failed {n}: {failed_ids} {resp['Failed']}")
+                entries = [entry for entry in entries if entry["Id"] in failed_ids]
                 n += 1
-                if n >= self.MAX_RETRY:
-                    raise
-                continue
-            if "Failed" not in resp:
-                return
-            failed_ids = set(d["Id"] for d in resp["Failed"])
-            await utils.info(f"Change failed {n}: {failed_ids} {resp['Failed']}")
-            entries = [entry for entry in entries if entry["Id"] in failed_ids]
-            n += 1
-        else:
-            raise Exception("change_message_visibility_batch failed")
+            else:
+                raise Exception("change_message_visibility_batch failed")
 
     async def change_one(self, message, visibility_timeout: int):
         if self.change_worker:
             await self.change_worker.put((message, visibility_timeout))
             return
-        return await self.client.change_message_visibility(
-            QueueUrl=(await self._get_queue_url()),
-            ReceiptHandle=message["ReceiptHandle"],
-            VisibilityTimeout=visibility_timeout,
-        )
+        async with self.create_client() as client:
+            return await client.change_message_visibility(
+                QueueUrl=(await self._get_queue_url()),
+                ReceiptHandle=message["ReceiptHandle"],
+                VisibilityTimeout=visibility_timeout,
+            )
 
     async def delete_batch(self, messages: list) -> None:
         entries = [
@@ -223,36 +227,40 @@ class SQSProcesser:
         ]
         queue_url = await self._get_queue_url()
         n = 0
-        while n < self.MAX_RETRY:
-            if n > 0:
-                await asyncio.sleep(self.sleep_base * (2 ** n))
-            try:
-                resp = await self.client.delete_message_batch(
-                    QueueUrl=queue_url, Entries=entries
+        async with self.create_client() as client:
+            while n < self.MAX_RETRY:
+                if n > 0:
+                    await asyncio.sleep(self.sleep_base * (2 ** n))
+                try:
+                    resp = await client.delete_message_batch(
+                        QueueUrl=queue_url, Entries=entries
+                    )
+                except Exception as e:
+                    await utils.handle_exc(e)
+                    n += 1
+                    if n >= self.MAX_RETRY:
+                        raise
+                    continue
+                if "Failed" not in resp:
+                    return
+                failed_ids = set(
+                    d["Id"] for d in resp["Failed"] if not d["SenderFault"]
                 )
-            except Exception as e:
-                await utils.handle_exc(e)
+                await utils.info(f"Delete failed {n}: {failed_ids}, {resp['Failed']}")
+                entries = [entry for entry in entries if entry["Id"] in failed_ids]
                 n += 1
-                if n >= self.MAX_RETRY:
-                    raise
-                continue
-            if "Failed" not in resp:
-                return
-            failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
-            await utils.info(f"Delete failed {n}: {failed_ids}, {resp['Failed']}")
-            entries = [entry for entry in entries if entry["Id"] in failed_ids]
-            n += 1
-        else:
-            raise Exception("delete_message_batch failed", messages)
+            else:
+                raise Exception("delete_message_batch failed", messages)
 
     async def delete_one(self, message):
         if self.delete_worker:
             await self.delete_worker.put(message)
             return
-        return await self.client.delete_message(
-            QueueUrl=(await self._get_queue_url()),
-            ReceiptHandle=message["ReceiptHandle"],
-        )
+        async with self.create_client() as client:
+            return await client.delete_message(
+                QueueUrl=(await self._get_queue_url()),
+                ReceiptHandle=message["ReceiptHandle"],
+            )
 
     def after_server_stop(self, func: FunctionType) -> None:
         self.hooks["after_server_stop"].add(func)

@@ -30,9 +30,8 @@ class SQSWriter:
         self.encode_func = encode_func or (
             lambda o: base64.b64encode(pickle.dumps(o, 2)).decode("ascii")
         )
-        client_params = client_params or {}
-        client_params["region_name"] = region_name
-        self.client = self.session.create_client(self.service_name, **client_params)
+        self.client_params = client_params or {}
+        self.client_params["region_name"] = region_name
         self.QueueUrl = None
         self.lock = asyncio.Lock()
         worker_params = worker_params or {}
@@ -45,18 +44,21 @@ class SQSWriter:
             f"queue={self.queue_name}, worker={self.worker!r}>"
         )
 
+    def create_client(self):
+        return self.session.create_client(self.service_name, **self.client_params)
+
     async def _get_queue_url(self) -> str:
         if self.QueueUrl is None:
             async with self.lock:
                 if self.QueueUrl is None:
-                    resp = await self.client.get_queue_url(QueueName=self.queue_name)
+                    async with self.create_client() as client:
+                        resp = await client.get_queue_url(QueueName=self.queue_name)
                     self.QueueUrl = resp["QueueUrl"]
         return self.QueueUrl
 
     async def stop(self) -> None:
         timestamp = time.time()
         await self.worker.stop()
-        await self.client.close()
         cost = time.time() - timestamp
         await utils.info(f"{self!r} stopped in {cost:.1f} seconds")
 
@@ -87,13 +89,14 @@ class SQSWriter:
             await self.worker.put(message)
             return
         queue_url = await self._get_queue_url()
-        return await self.client.send_message(
-            QueueUrl=queue_url,
-            MessageBody=self._encode(record),
-            DelaySeconds=delay_seconds,
-            MessageAttributes=attributes,
-            **message["params"],
-        )
+        async with self.create_client() as client:
+            return await client.send_message(
+                QueueUrl=queue_url,
+                MessageBody=self._encode(record),
+                DelaySeconds=delay_seconds,
+                MessageAttributes=attributes,
+                **message["params"],
+            )
 
     async def write_batch(self, obj_list: list) -> None:
         Entries = [
@@ -108,27 +111,30 @@ class SQSWriter:
         ]
         queue_url = await self._get_queue_url()
         n = 0
-        while n < self.MAX_RETRY:
-            if n > 0:
-                await asyncio.sleep(self.sleep_base * (2 ** n))
-            try:
-                resp = await self.client.send_message_batch(
-                    QueueUrl=queue_url, Entries=Entries
+        async with self.create_client() as client:
+            while n < self.MAX_RETRY:
+                if n > 0:
+                    await asyncio.sleep(self.sleep_base * (2 ** n))
+                try:
+                    resp = await client.send_message_batch(
+                        QueueUrl=queue_url, Entries=Entries
+                    )
+                except Exception as e:
+                    await utils.handle_exc(e)
+                    n += 1
+                    if n >= self.MAX_RETRY:
+                        raise
+                    continue
+                if "Failed" not in resp:
+                    return
+                failed_ids = set(
+                    d["Id"] for d in resp["Failed"] if not d["SenderFault"]
                 )
-            except Exception as e:
-                await utils.handle_exc(e)
+                await utils.info(f"Send failed {n}: {failed_ids}, {resp['Failed']}")
+                Entries = [entry for entry in Entries if entry["Id"] in failed_ids]
                 n += 1
-                if n >= self.MAX_RETRY:
-                    raise
-                continue
-            if "Failed" not in resp:
-                return
-            failed_ids = set(d["Id"] for d in resp["Failed"] if not d["SenderFault"])
-            await utils.info(f"Send failed {n}: {failed_ids}, {resp['Failed']}")
-            Entries = [entry for entry in Entries if entry["Id"] in failed_ids]
-            n += 1
-        else:
-            raise Exception("write_batch error: SQS send_message_batch failed")
+            else:
+                raise Exception("write_batch error: SQS send_message_batch failed")
 
     def async_rpc(
         self,

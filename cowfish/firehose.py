@@ -27,9 +27,8 @@ class Firehose:
         self.stream_name = stream_name
         self.encode_func = encode_func or (lambda o: json.dumps(o).encode())
         self.delimiter = delimiter
-        client_params = client_params or {}
-        client_params["region_name"] = region_name
-        self.client = self.session.create_client(self.service_name, **client_params)
+        self.client_params = client_params or {}
+        self.client_params["region_name"] = region_name
         worker_params = worker_params or {}
         worker_params.setdefault("name", "FirehoseWorker")
         batch_func = self.original_batch if original_api else self.write_batch
@@ -41,13 +40,15 @@ class Firehose:
             f"stream={self.stream_name}, worker={self.worker!r}>"
         )
 
+    def create_client(self):
+        return self.session.create_client(self.service_name, **self.client_params)
+
     async def put(self, obj) -> None:
         return await self.worker.put(obj)
 
     async def stop(self) -> None:
         timestamp = time.time()
         await self.worker.stop()
-        await self.client.close()
         cost = time.time() - timestamp
         await utils.info(f"{self!r} stopped in {cost:.1f} seconds")
 
@@ -59,45 +60,47 @@ class Firehose:
     async def write_batch(self, obj_list: list) -> None:
         record = {"Data": self._encode(obj_list)}
         n = 0
-        while n < self.MAX_RETRY:
-            if n > 0:
-                await asyncio.sleep(self.sleep_base * (2 ** n))
-            try:
-                await self.client.put_record(
-                    DeliveryStreamName=self.stream_name, Record=record
-                )
-            except Exception as e:
-                await utils.handle_exc(e)
-                n += 1
-                if n >= self.MAX_RETRY:
-                    raise
-                continue
-            return
+        async with self.create_client() as client:
+            while n < self.MAX_RETRY:
+                if n > 0:
+                    await asyncio.sleep(self.sleep_base * (2 ** n))
+                try:
+                    await client.put_record(
+                        DeliveryStreamName=self.stream_name, Record=record
+                    )
+                except Exception as e:
+                    await utils.handle_exc(e)
+                    n += 1
+                    if n >= self.MAX_RETRY:
+                        raise
+                    continue
+                return
 
     async def original_batch(self, obj_list: list) -> None:
         records = [{"Data": self.encode_func(obj) + self.delimiter} for obj in obj_list]
         n = 0
-        while n < self.MAX_RETRY:
-            if n > 0:
-                await asyncio.sleep(self.sleep_base * (2 ** n))
-            try:
-                resp = await self.client.put_record_batch(
-                    DeliveryStreamName=self.stream_name, Records=records
-                )
-            except Exception as e:
-                await utils.handle_exc(e)
-                n += 1
-                if n >= self.MAX_RETRY:
-                    raise
-                continue
-            if resp["FailedPutCount"] > 0:
-                records = [
-                    records[i]
-                    for i, record in enumerate(resp["RequestResponses"])
-                    if "ErrorCode" in record
-                ]
-                n += 1
-                continue
-            return
-        else:
-            raise Exception("write_batch error: firehose put_record_batch failed")
+        async with self.create_client() as client:
+            while n < self.MAX_RETRY:
+                if n > 0:
+                    await asyncio.sleep(self.sleep_base * (2 ** n))
+                try:
+                    resp = await client.put_record_batch(
+                        DeliveryStreamName=self.stream_name, Records=records
+                    )
+                except Exception as e:
+                    await utils.handle_exc(e)
+                    n += 1
+                    if n >= self.MAX_RETRY:
+                        raise
+                    continue
+                if resp["FailedPutCount"] > 0:
+                    records = [
+                        records[i]
+                        for i, record in enumerate(resp["RequestResponses"])
+                        if "ErrorCode" in record
+                    ]
+                    n += 1
+                    continue
+                return
+            else:
+                raise Exception("write_batch error: firehose put_record_batch failed")

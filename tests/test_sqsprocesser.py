@@ -15,6 +15,11 @@ def test_processer(sqs_server):
     processer = SQSProcesser(
         queue_name, plain_handler, region_name="us-east-1", client_params=client_params
     )
-    loop.run_until_complete(processer.client.create_queue(QueueName=queue_name))
+
+    async def foo():
+        async with processer.create_client() as client:
+            await client.create_queue(QueueName=queue_name)
+
+    loop.run_until_complete(foo())
     loop.call_later(2, processer.quit_event.set)
     processer.start()

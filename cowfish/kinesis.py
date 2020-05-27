@@ -28,9 +28,8 @@ class Kinesis:
         self.stream_name = stream_name
         self.encode_func = encode_func or (lambda o: json.dumps(o).encode())
         self.key_func = key_func
-        client_params = client_params or {}
-        client_params["region_name"] = region_name
-        self.client = self.session.create_client(self.service_name, **client_params)
+        self.client_params = client_params or {}
+        self.client_params["region_name"] = region_name
         worker_params = worker_params or {}
         worker_params.setdefault("name", "KinesisWorker")
         self.worker = BatchWorker(self.write_batch, **worker_params)
@@ -41,10 +40,12 @@ class Kinesis:
             f"stream={self.stream_name}, worker={self.worker!r}>"
         )
 
+    def create_client(self):
+        return self.session.create_client(self.service_name, **self.client_params)
+
     async def stop(self) -> None:
         timestamp = time.time()
         await self.worker.stop()
-        await self.client.close()
         cost = time.time() - timestamp
         await utils.info(f"{self!r} stopped in {cost:.1f} seconds")
 
@@ -62,38 +63,40 @@ class Kinesis:
             for obj in obj_list
         ]
         n = 0
-        while n < self.MAX_RETRY:
-            if n > 0:
-                await asyncio.sleep(self.sleep_base * (2 ** n))
-            try:
-                resp = await self.client.put_records(
-                    StreamName=self.stream_name, Records=records
-                )
-            except Exception as e:
-                await utils.handle_exc(e)
+        async with self.create_client() as client:
+            while n < self.MAX_RETRY:
+                if n > 0:
+                    await asyncio.sleep(self.sleep_base * (2 ** n))
+                try:
+                    resp = await client.put_records(
+                        StreamName=self.stream_name, Records=records
+                    )
+                except Exception as e:
+                    await utils.handle_exc(e)
+                    n += 1
+                    if n >= self.MAX_RETRY:
+                        raise
+                    continue
+                if resp["FailedRecordCount"] == 0:
+                    return
+                records = [
+                    records[i]
+                    for i, record in enumerate(resp["Records"])
+                    if "ErrorCode" in record
+                ]
                 n += 1
-                if n >= self.MAX_RETRY:
-                    raise
-                continue
-            if resp["FailedRecordCount"] == 0:
-                return
-            records = [
-                records[i]
-                for i, record in enumerate(resp["Records"])
-                if "ErrorCode" in record
-            ]
-            n += 1
         raise Exception("write_batch error: kinesis put_records failed")
 
     async def write_one(self, obj, queued: bool = False):
         if queued:
             await self.worker.put(obj)
             return
-        return await self.client.put_record(
-            StreamName=self.stream_name,
-            Data=self._encode(obj),
-            PartitionKey=self._get_key(obj),
-        )
+        async with self.create_client() as client:
+            return await client.put_record(
+                StreamName=self.stream_name,
+                Data=self._encode(obj),
+                PartitionKey=self._get_key(obj),
+            )
 
 
 class CompactKinesis(Kinesis):
