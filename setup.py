@@ -50,9 +50,8 @@ setup(
         "coverage",
         "pytest-cov",
         "pytest-asyncio",
-        "aiohttp",
-        "requests",
         "msgpack",
         "flask",
+        "requests",
     ],
 )

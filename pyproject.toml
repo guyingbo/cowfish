@@ -2,30 +2,21 @@
 line-length = 88
 include = '\.pyi?$'
 
+[tool.poetry]
+name = "cowfish"
+version = "0.3.0"
+description = "A useful asynchronous library built on top of aiobotocore"
+authors = ["Gu Yingbo <tensiongyb@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+moto = "^1.3.14"
+aiobotocore = ">=1.0.0"
+pytest = "^5.4.2"
+
+[tool.poetry.dev-dependencies]
+
 [build-system]
-requires = ["flit"]
-build-backend = "flit.buildapi"
-
-[tool.flit.metadata]
-module = "cowfish"
-author = "Yingbo Gu"
-author-email = "tensiongyb@gmail.com"
-maintainer="Yingbo Gu"
-maintainer-email="tensiongyb@gmail.com"
-home-page = "https://github.com/guyingbo/cowfish"
-description-file = "README.md"
-requires-python=">=3.6"
-classifiers = [
-    "License :: OSI Approved :: MIT License",
-    "Framework :: AsyncIO",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-]
-requires = ["aiobotocore"]
-dev-requires = ["pytest", "coverage", "pytest-cov", "pytest-asyncio"]
-keywords = "AWS aiobotocore cowfish kinesis SQS firehose asyncio"
-
-[tool.flit.entrypoints.console_scripts]
-sqsprocesser = "cowfish.sqsprocesser:main"
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
