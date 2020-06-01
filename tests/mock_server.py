@@ -34,8 +34,7 @@ def start_service(service_name):
         url = url_pattern.search(line).group()
 
         try:
-            r = requests.get(url, timeout=0.5)
-            print(r)
+            requests.get(url, timeout=0.5)
             break
         except requests.exceptions.ConnectionError:
             time.sleep(0.5)
