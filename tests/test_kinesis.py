@@ -1,9 +1,5 @@
 import pytest
-import asyncio
 from cowfish.kinesis import Kinesis, CompactKinesis
-from moto import mock_kinesis
-
-loop = asyncio.get_event_loop()
 
 
 @pytest.mark.asyncio
@@ -22,16 +18,16 @@ async def test_kinesis(kinesis_server):
     await kinesis.stop()
 
 
-# @pytest.mark.asyncio
-# async def test_compact_kinesis(kinesis_server):
-#     client_params = {
-#         "endpoint_url": kinesis_server,
-#         "aws_access_key_id": "xxx",
-#         "aws_secret_access_key": "xxx",
-#     }
-#     kinesis = CompactKinesis(
-#         "fake", region_name="us-east-1", client_params=client_params
-#     )
-#     await kinesis.write({"test": 1})
-#     await kinesis.flush()
-#     await kinesis.stop()
+@pytest.mark.asyncio
+async def test_compact_kinesis(kinesis_server):
+    client_params = {
+        "endpoint_url": kinesis_server,
+        "aws_access_key_id": "xxx",
+        "aws_secret_access_key": "xxx",
+    }
+    kinesis = CompactKinesis(
+        "fake", region_name="us-east-1", client_params=client_params
+    )
+    await kinesis.write({"test": 1})
+    await kinesis.flush()
+    await kinesis.stop()
