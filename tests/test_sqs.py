@@ -45,7 +45,6 @@ async def test_sqs(sqs_server):
 
     await bar()
     await writer.async_rpc("foo")(3, 4)
-    stop()
     for i in range(10):
         await writer.write_one({"test": 2}, queued=True)
     await writer.stop()
