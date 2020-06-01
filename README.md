@@ -1,6 +1,6 @@
 # cowfish
 
-[![Build Status](https://travis-ci.org/guyingbo/cowfish.svg?branch=master)](https://travis-ci.org/guyingbo/cowfish)
+![Python package](https://github.com/guyingbo/cowfish/workflows/Python%20package/badge.svg)
 [![Python Version](https://img.shields.io/pypi/pyversions/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
 [![Version](https://img.shields.io/pypi/v/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
 [![Format](https://img.shields.io/pypi/format/cowfish.svg)](https://pypi.python.org/pypi/cowfish)
